@@ -1,0 +1,119 @@
+.medicamento-card {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-background {
+  padding: 16px;
+  min-height: 120px;
+}
+
+.card-content {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.med-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.med-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.med-info {
+  flex: 1;
+}
+
+.med-nombre {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+}
+
+.med-tomas-count {
+  font-size: 12px;
+  color: #666;
+}
+
+.med-hora {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.tomas-barras {
+  margin-bottom: 12px;
+}
+
+.toma-item {
+  margin-bottom: 8px;
+}
+
+.toma-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.btn-marcar {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.btn-marcar:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.stock-info {
+  font-size: 13px;
+  color: #333;
+  text-align: center;
+}
+
+.stock-info strong {
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .card-background {
+    padding: 12px;
+  }
+
+  .card-content {
+    padding: 12px;
+  }
+
+  .med-nombre {
+    font-size: 16px;
+  }
+
+  .med-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+}
+
