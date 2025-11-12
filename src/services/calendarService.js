@@ -19,17 +19,13 @@ export const guardarTokenGoogle = async (userId, tokenData) => {
       throw new Error('Firestore no está disponible');
     }
 
-    console.log('Guardando token para usuario:', userId, 'Token data:', tokenData);
-
     const tokenParaGuardar = {
       ...tokenData,
       fechaActualizacion: new Date().toISOString(),
-      userId: userId // Agregar userId para referencia
+      userId: userId
     };
 
     await setDoc(doc(db, 'googleTokens', userId), tokenParaGuardar, { merge: true });
-
-    console.log('Token guardado exitosamente en Firestore');
     return { success: true };
   } catch (error) {
     console.error('Error al guardar token:', error);
@@ -46,17 +42,13 @@ export const guardarTokenGoogle = async (userId, tokenData) => {
 export const obtenerTokenGoogle = async (userId) => {
   try {
     if (!db) {
-      console.log('Firestore no disponible');
       return null;
     }
 
     const tokenDoc = await getDoc(doc(db, 'googleTokens', userId));
     if (tokenDoc.exists()) {
-      const tokenData = tokenDoc.data();
-      console.log('Token encontrado para usuario:', userId, 'Tiene access_token:', !!tokenData.access_token);
-      return tokenData;
+      return tokenDoc.data();
     }
-    console.log('No se encontró token para usuario:', userId);
     return null;
   } catch (error) {
     console.error('Error al obtener token:', error);

@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MedProvider } from './context/MedContext';
-import { mockMedicamentos } from './data/mockData';
 
 import LandingScreen from './screens/LandingScreen';
 import LoginScreen from './screens/LoginScreen';
@@ -28,7 +27,7 @@ function App() {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <AuthProvider>
         <BrowserRouter future={{ v7_relativeSplatPath: true }}>
-          <MedProvider medicamentosIniciales={mockMedicamentos}>
+          <MedProvider>
             <Routes>
             <Route path="/" element={<LandingScreen />} />
             <Route path="/login" element={<LoginScreen />} />

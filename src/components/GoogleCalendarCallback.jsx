@@ -18,29 +18,21 @@ const GoogleCalendarCallback = () => {
         // Obtener el token de la URL
         const tokenData = obtenerTokenDeURL();
         
-        console.log('Callback OAuth - Token data:', tokenData ? 'Encontrado' : 'No encontrado');
-        console.log('Callback OAuth - Usuario actual:', usuarioActual ? usuarioActual.id : 'No autenticado');
-
         if (!tokenData) {
-          console.error('No se encontró token en la URL');
           alert('Error: No se pudo obtener el token de Google. Intenta nuevamente.');
           navigate('/ajustes');
           return;
         }
 
         if (!usuarioActual) {
-          console.error('Usuario no autenticado en callback');
           alert('Error: Debes estar autenticado. Redirigiendo al login...');
           navigate('/login');
           return;
         }
 
-        // Guardar el token
-        console.log('Guardando token en callback...');
         const resultado = await guardarTokenGoogle(usuarioActual.id, tokenData);
         
         if (resultado.success) {
-          console.log('Token guardado exitosamente');
           // Limpiar la URL antes de redirigir
           window.history.replaceState({}, document.title, '/ajustes');
           navigate('/ajustes', { replace: true });

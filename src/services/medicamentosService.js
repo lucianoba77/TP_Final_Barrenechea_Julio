@@ -120,28 +120,17 @@ export const agregarMedicamento = async (userId, medicamentoData) => {
       const { crearEventosRecurrentes } = await import('./calendarService');
       const tokenData = await obtenerTokenGoogle(userId);
       
-      console.log('Token data obtenido:', tokenData ? 'Sí' : 'No');
-      
       if (tokenData && tokenData.access_token) {
-        console.log('Creando eventos en Google Calendar...');
         const resultado = await crearEventosRecurrentes(
           tokenData.access_token,
           medicamentoCompleto
         );
         
-        console.log('Resultado de crear eventos:', resultado);
-        
         if (resultado.success && resultado.eventoIds) {
-          // Actualizar el medicamento con los IDs de eventos
           await updateDoc(docRef, {
             eventoIdsGoogleCalendar: resultado.eventoIds
           });
-          console.log('Eventos creados y guardados:', resultado.eventoIds.length);
-        } else {
-          console.warn('No se pudieron crear eventos:', resultado.error);
         }
-      } else {
-        console.log('No hay access_token disponible. Token data:', tokenData);
       }
     } catch (calendarError) {
       // Si falla la sincronización con Google Calendar, no es crítico

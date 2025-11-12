@@ -24,10 +24,6 @@ try {
   app = initializeApp(firebaseConfig);
 } catch (error) {
   console.error('Error al inicializar Firebase:', error);
-  // En desarrollo, permite continuar sin Firebase
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('Firebase no está configurado. Usando datos mock.');
-  }
 }
 
 // Inicializar servicios de Firebase

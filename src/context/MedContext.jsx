@@ -12,9 +12,9 @@ import {
 
 const MedContext = createContext();
 
-export const MedProvider = ({ children, medicamentosIniciales = [] }) => {
+export const MedProvider = ({ children }) => {
   const { usuarioActual } = useAuth();
-  const [medicamentos, setMedicamentos] = useState(medicamentosIniciales);
+  const [medicamentos, setMedicamentos] = useState([]);
   const [cargando, setCargando] = useState(false);
 
   // Cargar medicamentos cuando el usuario se autentica
@@ -29,8 +29,7 @@ export const MedProvider = ({ children, medicamentosIniciales = [] }) => {
 
       return () => unsubscribe();
     } else {
-      // Si no hay usuario, usar datos mock
-      setMedicamentos(medicamentosIniciales);
+      setMedicamentos([]);
     }
   }, [usuarioActual]);
 
@@ -70,55 +69,37 @@ export const MedProvider = ({ children, medicamentosIniciales = [] }) => {
       }
       return resultado;
     } catch (error) {
-      // Fallback a datos locales si Firebase falla
-      console.warn('Error al agregar en Firestore, usando datos locales:', error);
-      const nuevoId = `${Date.now()}`;
-      const nuevaMedicina = {
-        ...medicina,
-        id: nuevoId,
-        stockActual: medicina.stockInicial,
-        tomasRealizadas: []
+      console.error('Error al agregar medicamento:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al agregar medicamento'
       };
-      setMedicamentos([...medicamentos, nuevaMedicina]);
-      return { success: true, medicina: nuevaMedicina };
     }
   };
 
   const editarMedicina = async (id, datosActualizados) => {
     try {
       const resultado = await actualizarMedicamento(id, datosActualizados);
-      if (resultado.success) {
-        // La suscripción en tiempo real actualizará el estado automáticamente
-        return resultado;
-      }
-      // Fallback a datos locales
-      setMedicamentos(medicamentos.map(medicamento => 
-        medicamento.id === id ? { ...medicamento, ...datosActualizados } : medicamento
-      ));
-      return { success: true };
+      return resultado;
     } catch (error) {
-      // Fallback a datos locales
-      setMedicamentos(medicamentos.map(medicamento => 
-        medicamento.id === id ? { ...medicamento, ...datosActualizados } : medicamento
-      ));
-      return { success: true };
+      console.error('Error al editar medicamento:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al editar medicamento'
+      };
     }
   };
 
   const eliminarMedicina = async (id) => {
     try {
       const resultado = await eliminarMedicamentoFirebase(id);
-      if (resultado.success) {
-        // La suscripción en tiempo real actualizará el estado automáticamente
-        return resultado;
-      }
-      // Fallback a datos locales
-      setMedicamentos(medicamentos.filter(medicamento => medicamento.id !== id));
-      return { success: true };
+      return resultado;
     } catch (error) {
-      // Fallback a datos locales
-      setMedicamentos(medicamentos.filter(medicamento => medicamento.id !== id));
-      return { success: true };
+      console.error('Error al eliminar medicamento:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al eliminar medicamento'
+      };
     }
   };
 
@@ -129,47 +110,13 @@ export const MedProvider = ({ children, medicamentosIniciales = [] }) => {
   const marcarToma = async (id, hora) => {
     try {
       const resultado = await marcarTomaRealizadaFirebase(id, hora);
-      if (resultado.success) {
-        // La suscripción en tiempo real actualizará el estado automáticamente
-        return resultado;
-      }
-      // Fallback a datos locales
-      const fecha = new Date().toISOString().split('T')[0];
-      setMedicamentos(medicamentos.map(medicamento => {
-        if (medicamento.id === id) {
-          const nuevaToma = {
-            fecha,
-            hora,
-            tomada: true
-          };
-          return {
-            ...medicamento,
-            stockActual: medicamento.stockActual > 0 ? medicamento.stockActual - 1 : 0,
-            tomasRealizadas: [...medicamento.tomasRealizadas, nuevaToma]
-          };
-        }
-        return medicamento;
-      }));
-      return { success: true };
+      return resultado;
     } catch (error) {
-      // Fallback a datos locales
-      const fecha = new Date().toISOString().split('T')[0];
-      setMedicamentos(medicamentos.map(medicamento => {
-        if (medicamento.id === id) {
-          const nuevaToma = {
-            fecha,
-            hora,
-            tomada: true
-          };
-          return {
-            ...medicamento,
-            stockActual: medicamento.stockActual > 0 ? medicamento.stockActual - 1 : 0,
-            tomasRealizadas: [...medicamento.tomasRealizadas, nuevaToma]
-          };
-        }
-        return medicamento;
-      }));
-      return { success: true };
+      console.error('Error al marcar toma:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al marcar toma'
+      };
     }
   };
 

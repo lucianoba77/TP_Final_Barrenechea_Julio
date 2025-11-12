@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMed } from '../context/MedContext';
 import { useAuth } from '../context/AuthContext';
-import { coloresMedicamento } from '../data/mockData';
+import { coloresMedicamento } from '../constants/colores';
 import { esUsuarioPremium, obtenerMensajeLimite } from '../utils/subscription';
 import './NuevaMedicinaScreen.css';
 
