@@ -29,7 +29,6 @@ export const MedProvider = ({ children }) => {
       const userId = userIdBase || usuarioActual.uid;
 
       if (!userId) {
-        console.warn('No se pudo determinar el userId para suscribir medicamentos.');
         return undefined;
       }
       
@@ -57,7 +56,6 @@ export const MedProvider = ({ children }) => {
     const userId = userIdBase || usuarioActual.uid;
 
     if (!userId) {
-      console.warn('No se pudo determinar el userId para cargar medicamentos.');
       setCargando(false);
       return;
     }
@@ -66,6 +64,8 @@ export const MedProvider = ({ children }) => {
     const resultado = await obtenerMedicamentos(userId);
     if (resultado.success) {
       setMedicamentos(resultado.medicamentos);
+    } else {
+      console.error('Error al cargar medicamentos:', resultado.error);
     }
     setCargando(false);
   };

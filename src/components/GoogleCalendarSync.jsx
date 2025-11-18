@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { 
@@ -17,8 +16,34 @@ const GoogleCalendarSync = () => {
   const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
   useEffect(() => {
-    // Solo verificar conexión, el callback se maneja en GoogleCalendarCallback
     verificarConexion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarioActual]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (usuarioActual) {
+        setTimeout(() => verificarConexion(), 1000);
+      }
+    };
+
+    const handleLocationChange = () => {
+      if (usuarioActual && window.location.pathname === '/ajustes') {
+        setTimeout(() => verificarConexion(), 1000);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('popstate', handleLocationChange);
+    
+    if (window.location.pathname === '/ajustes' && usuarioActual) {
+      setTimeout(() => verificarConexion(), 1000);
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioActual]);
 
@@ -29,7 +54,14 @@ const GoogleCalendarSync = () => {
     }
 
     try {
-      const tieneConexion = await tieneGoogleCalendarConectado(usuarioActual.id);
+      const userId = usuarioActual.id || usuarioActual.uid;
+      if (!userId) {
+        setConectado(false);
+        setCargando(false);
+        return;
+      }
+
+      const tieneConexion = await tieneGoogleCalendarConectado(userId);
       setConectado(tieneConexion);
     } catch (error) {
       console.error('Error al verificar conexión:', error);
@@ -39,41 +71,42 @@ const GoogleCalendarSync = () => {
     }
   };
 
+  const manejarConectar = () => {
+    if (!usuarioActual) {
+      showError('Debes estar autenticado para conectar Google Calendar');
+      return;
+    }
 
-  const manejarLoginExitoso = async (credentialResponse) => {
-    if (!usuarioActual) return;
+    if (!GOOGLE_CLIENT_ID) {
+      showWarning('Google Client ID no configurado. Configura REACT_APP_GOOGLE_CLIENT_ID en .env');
+      return;
+    }
 
     try {
-      // El credentialResponse contiene el token de ID de Google
-      // Para obtener access_token necesitamos usar el flujo OAuth 2.0 implícito
-      if (GOOGLE_CLIENT_ID) {
-        autorizarGoogleCalendar(GOOGLE_CLIENT_ID);
-      } else {
-        showWarning('Google Client ID no configurado. Configura REACT_APP_GOOGLE_CLIENT_ID en .env');
-      }
+      autorizarGoogleCalendar(GOOGLE_CLIENT_ID);
     } catch (error) {
       console.error('Error al iniciar autorización:', error);
       showError('Error al conectar Google Calendar');
     }
   };
 
-  const manejarLogout = async () => {
+  const manejarDesconectar = async () => {
     if (!usuarioActual) return;
 
     try {
-      googleLogout();
-      await eliminarTokenGoogle(usuarioActual.id);
+      const userId = usuarioActual.id || usuarioActual.uid;
+      if (!userId) {
+        showError('No se pudo identificar el usuario');
+        return;
+      }
+
+      await eliminarTokenGoogle(userId);
       setConectado(false);
       showSuccess('Google Calendar desconectado correctamente');
     } catch (error) {
       console.error('Error al desconectar:', error);
       showError('Error al desconectar Google Calendar');
     }
-  };
-
-  const manejarError = (error) => {
-    console.error('Error en Google Login:', error);
-    showError('Error al conectar con Google Calendar');
   };
 
   if (cargando) {
@@ -97,7 +130,7 @@ const GoogleCalendarSync = () => {
             Tus tomas de medicamentos se sincronizarán automáticamente con Google Calendar.
             Los eventos se crearán con recordatorios 15 y 5 minutos antes de cada toma.
           </p>
-          <button onClick={manejarLogout} className="btn-disconnect">
+          <button onClick={manejarDesconectar} className="btn-disconnect">
             Desconectar Google Calendar
           </button>
         </div>
@@ -111,11 +144,9 @@ const GoogleCalendarSync = () => {
             Conecta tu cuenta de Google para sincronizar automáticamente tus tomas de medicamentos
             con Google Calendar. Recibirás recordatorios en tu calendario.
           </p>
-          <GoogleLogin
-            onSuccess={manejarLoginExitoso}
-            onError={manejarError}
-            useOneTap={false}
-          />
+          <button onClick={manejarConectar} className="btn-connect">
+            📅 Conectar Google Calendar
+          </button>
         </div>
       )}
 

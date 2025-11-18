@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMed } from '../context/MedContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { obtenerIconoPresentacion } from '../utils/presentacionIcons';
 import MainMenu from '../components/MainMenu';
@@ -10,7 +11,11 @@ import './BotiquinScreen.css';
 const BotiquinScreen = () => {
   const navigate = useNavigate();
   const { medicamentos, eliminarMedicina, suspenderMedicina, restarStock } = useMed();
+  const { usuarioActual } = useAuth();
   const { showConfirm, showSuccess, showError } = useNotification();
+  
+  const esAsistente = usuarioActual?.role === 'asistente';
+  const nombrePaciente = usuarioActual?.paciente?.nombre || 'Paciente';
   const formatearFecha = (fecha) => {
     if (!fecha) return 'Sin registrar';
     const date = new Date(fecha);
@@ -48,8 +53,8 @@ const BotiquinScreen = () => {
   return (
     <div className="botiquin-screen">
       <div className="botiquin-header">
-        <button className="btn-home" onClick={() => navigate('/dashboard')}>🏠</button>
-        <h1>Mi Botiquín</h1>
+        <button className="btn-home" onClick={() => navigate(esAsistente ? '/botiquin' : '/dashboard')}>🏠</button>
+        <h1>{esAsistente ? `Botiquín del Paciente ${nombrePaciente}` : 'Mi Botiquín'}</h1>
         <UserMenu />
       </div>
 

@@ -17,22 +17,47 @@ const GoogleCalendarCallback = () => {
   useEffect(() => {
     const procesarCallback = async () => {
       try {
-        // Obtener el token de la URL
-        const tokenData = obtenerTokenDeURL();
+        let intentos = 0;
+        const maxIntentos = 20;
         
+        while (!usuarioActual && intentos < maxIntentos) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          intentos++;
+        }
+
+        if (!usuarioActual) {
+          showError('Sesión no disponible. Por favor, inicia sesión nuevamente.');
+          navigate('/login');
+          return;
+        }
+
+        const hash = window.location.hash;
+        if (hash) {
+          const params = new URLSearchParams(hash.substring(1));
+          const error = params.get('error');
+          if (error) {
+            const errorDescription = params.get('error_description') || 'Error desconocido';
+            showError('No se pudo conectar con Google Calendar: ' + errorDescription);
+            navigate('/ajustes');
+            return;
+          }
+        }
+
+        const tokenData = obtenerTokenDeURL();
         if (!tokenData) {
           showError('No se pudo obtener el token de Google. Intenta nuevamente.');
           navigate('/ajustes');
           return;
         }
 
-        if (!usuarioActual) {
-          showError('Debes estar autenticado. Redirigiendo al login...');
+        const userId = usuarioActual.id || usuarioActual.uid;
+        if (!userId) {
+          showError('Error al identificar el usuario. Por favor, inicia sesión nuevamente.');
           navigate('/login');
           return;
         }
-
-        const resultado = await guardarTokenGoogle(usuarioActual.id, tokenData);
+        
+        const resultado = await guardarTokenGoogle(userId, tokenData);
         
         if (resultado.success) {
           window.history.replaceState({}, document.title, '/ajustes');

@@ -34,6 +34,7 @@ const HistorialScreen = () => {
   const adherenciaPromedioTotal = calcularAdherenciaPromedio(medicamentos, 'total');
   const estadoAdherencia = obtenerEstadoAdherencia(adherenciaPromedioTotal);
   const esAsistente = usuarioActual?.role === 'asistente';
+  const nombrePaciente = usuarioActual?.paciente?.nombre || 'Paciente';
 
   // Redirigir según el rol al hacer clic en home
   const handleHomeClick = () => {
@@ -48,8 +49,8 @@ const HistorialScreen = () => {
     <div className="historial-screen">
       <div className="historial-header">
         <button className="btn-home" onClick={handleHomeClick}>🏠</button>
-        <h1>Historial{esAsistente && ' del Paciente'}</h1>
-        {!esAsistente && <UserMenu />}
+        <h1>{esAsistente ? `Historial del Paciente ${nombrePaciente}` : 'Historial'}</h1>
+        <UserMenu />
       </div>
 
       <div className="historial-content">

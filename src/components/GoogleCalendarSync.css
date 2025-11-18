@@ -77,6 +77,26 @@
   transform: translateY(-2px);
 }
 
+.btn-connect {
+  padding: 12px 24px;
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-connect:hover {
+  background-color: #357ae8;
+  transform: translateY(-2px);
+}
+
 .calendar-sync-features {
   margin-top: 24px;
   padding-top: 24px;
@@ -129,6 +149,11 @@
   }
 
   .btn-disconnect {
+    width: 100%;
+    padding: 14px;
+  }
+
+  .btn-connect {
     width: 100%;
     padding: 14px;
   }

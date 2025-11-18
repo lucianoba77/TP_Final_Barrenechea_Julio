@@ -95,6 +95,17 @@ const GestionarAsistentes = () => {
         setTimeout(() => {
           navigate('/login');
         }, 2000);
+      } else if (resultado.sesionRestaurada) {
+        // Si la sesión se restauró correctamente, solo mostrar mensaje de éxito
+        showSuccess(`Asistente ${formData.nombre} agregado exitosamente. El asistente puede iniciar sesión con el email "${formData.email.trim()}" y la contraseña proporcionada.`);
+        setFormData({ email: '', nombre: '', password: '' });
+        setMostrarFormulario(false);
+        cargarAsistentes();
+        // Esperar un momento para que el estado de autenticación se actualice
+        setTimeout(() => {
+          // Recargar la página para asegurar que el estado se actualice
+          window.location.reload();
+        }, 1000);
       } else {
         showSuccess(`Asistente ${formData.nombre} agregado exitosamente. El asistente puede iniciar sesión con el email "${formData.email.trim()}" y la contraseña proporcionada.`);
         setFormData({ email: '', nombre: '', password: '' });

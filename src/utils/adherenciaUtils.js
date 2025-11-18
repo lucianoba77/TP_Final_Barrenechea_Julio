@@ -82,7 +82,7 @@ export const calcularAdherencia = (medicamento, periodo = 'total') => {
   
   const tomasRealizadasCount = tomasEnPeriodo.length;
   
-  // Calcular porcentaje basado en tomas (no días completos)
+  // Calcular porcentaje basado en tomas durante período de prueba de la app (no días completos)
   const porcentaje = Math.min(100, Math.round((tomasRealizadasCount / tomasEsperadas) * 100));
   
   return {
@@ -172,7 +172,7 @@ export const calcularTomasSemana = (medicamento) => {
           diaEncontrado.tomas++;
         }
       } catch (error) {
-        console.warn('Error al procesar fecha de toma:', error);
+        // Ignorar errores al procesar fechas
       }
     }
   });

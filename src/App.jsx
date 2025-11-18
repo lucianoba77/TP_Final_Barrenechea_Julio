@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MedProvider } from './context/MedContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -39,82 +38,74 @@ const RutaProtegida = ({ children, rolesPermitidos = ['paciente', 'asistente'] }
 };
 
 function App() {
-  const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
-
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <NotificationProvider>
-        <AuthProvider>
-          <BrowserRouter future={{ v7_relativeSplatPath: true }}>
-            <MedProvider>
-            <Routes>
-            <Route path="/" element={<LandingScreen />} />
-            <Route path="/login" element={<LoginScreen />} />
-            <Route path="/verificar-firebase" element={<VerificarFirebase />} />
+    <NotificationProvider>
+      <AuthProvider>
+        <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+          <MedProvider>
+          <Routes>
+          <Route path="/" element={<LandingScreen />} />
+          <Route path="/login" element={<LoginScreen />} />
+          <Route path="/verificar-firebase" element={<VerificarFirebase />} />
             <Route 
               path="/auth/google/callback" 
-              element={
-                <RutaProtegida>
-                  <GoogleCalendarCallback />
-                </RutaProtegida>
-              } 
+              element={<GoogleCalendarCallback />} 
             />
-            
-            {/* Rutas para pacientes */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <RutaProtegida rolesPermitidos={['paciente']}>
-                  <DashboardScreen />
-                </RutaProtegida>
-              } 
-            />
-            
-            <Route 
-              path="/nuevo" 
-              element={
-                <RutaProtegida rolesPermitidos={['paciente']}>
-                  <NuevaMedicinaScreen />
-                </RutaProtegida>
-              } 
-            />
-            
-            {/* Rutas para ambos roles */}
-            <Route 
-              path="/botiquin" 
-              element={
-                <RutaProtegida rolesPermitidos={['paciente', 'asistente']}>
-                  <BotiquinScreen />
-                </RutaProtegida>
-              } 
-            />
-            
-            <Route 
-              path="/historial" 
-              element={
-                <RutaProtegida rolesPermitidos={['paciente', 'asistente']}>
-                  <HistorialScreen />
-                </RutaProtegida>
-              } 
-            />
-            
-            {/* Rutas solo para pacientes */}
-            <Route 
-              path="/ajustes" 
-              element={
-                <RutaProtegida rolesPermitidos={['paciente']}>
-                  <AjustesScreen />
-                </RutaProtegida>
-              } 
-            />
-            
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-            </MedProvider>
-          </BrowserRouter>
-        </AuthProvider>
-      </NotificationProvider>
-    </GoogleOAuthProvider>
+          
+          {/* Rutas para pacientes */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <RutaProtegida rolesPermitidos={['paciente']}>
+                <DashboardScreen />
+              </RutaProtegida>
+            } 
+          />
+          
+          <Route 
+            path="/nuevo" 
+            element={
+              <RutaProtegida rolesPermitidos={['paciente']}>
+                <NuevaMedicinaScreen />
+              </RutaProtegida>
+            } 
+          />
+          
+          {/* Rutas para ambos roles */}
+          <Route 
+            path="/botiquin" 
+            element={
+              <RutaProtegida rolesPermitidos={['paciente', 'asistente']}>
+                <BotiquinScreen />
+              </RutaProtegida>
+            } 
+          />
+          
+          <Route 
+            path="/historial" 
+            element={
+              <RutaProtegida rolesPermitidos={['paciente', 'asistente']}>
+                <HistorialScreen />
+              </RutaProtegida>
+            } 
+          />
+          
+          {/* Rutas solo para pacientes */}
+          <Route 
+            path="/ajustes" 
+            element={
+              <RutaProtegida rolesPermitidos={['paciente']}>
+                <AjustesScreen />
+              </RutaProtegida>
+            } 
+          />
+          
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+          </MedProvider>
+        </BrowserRouter>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }
 

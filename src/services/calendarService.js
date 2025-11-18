@@ -34,6 +34,7 @@ export const guardarTokenGoogle = async (userId, tokenData) => {
 
 /**
  * Obtiene el token de acceso de Google del usuario
+ * Verifica si el token está expirado
  */
 export const obtenerTokenGoogle = async (userId) => {
   try {
@@ -42,9 +43,24 @@ export const obtenerTokenGoogle = async (userId) => {
     }
 
     const tokenDoc = await getDoc(doc(db, 'googleTokens', userId));
+    
     if (tokenDoc.exists()) {
-      return tokenDoc.data();
+      const tokenData = tokenDoc.data();
+      
+      if (tokenData.fechaObtencion && tokenData.expires_in) {
+        const fechaObtencion = new Date(tokenData.fechaObtencion);
+        const fechaExpiracion = new Date(fechaObtencion.getTime() + (tokenData.expires_in * 1000));
+        const ahora = new Date();
+        
+        if (ahora >= fechaExpiracion || (fechaExpiracion.getTime() - ahora.getTime()) < 5 * 60 * 1000) {
+          await eliminarTokenGoogle(userId);
+          return null;
+        }
+      }
+      
+      return tokenData;
     }
+    
     return null;
   } catch (error) {
     console.error('Error al obtener token:', error);
@@ -236,13 +252,32 @@ export const eliminarEventoToma = async (accessToken, eventoId) => {
 
 /**
  * Crea eventos recurrentes para todas las tomas de un medicamento
+ * Para medicamentos crónicos, crea eventos para 90 días
+ * Para medicamentos ocasionales (tomasDiarias === 0), no crea eventos
  */
 export const crearEventosRecurrentes = async (accessToken, medicamento) => {
   try {
+    // No crear eventos para medicamentos ocasionales
+    if (medicamento.tomasDiarias === 0) {
+      return {
+        success: true,
+        eventosCreados: 0,
+        eventoIds: []
+      };
+    }
+
     const eventos = [];
     const fechaHoy = new Date();
-    const fechaFin = new Date(fechaHoy);
-    fechaFin.setDate(fechaFin.getDate() + (medicamento.diasTratamiento || 30));
+    
+    // Determinar cuántos días de eventos crear
+    let diasTratamiento;
+    if (medicamento.esCronico) {
+      // Para medicamentos crónicos, crear eventos para 90 días
+      diasTratamiento = 90;
+    } else {
+      // Para medicamentos con fin de tratamiento, usar días de tratamiento o 30 por defecto
+      diasTratamiento = medicamento.diasTratamiento || 30;
+    }
 
     // Calcular todas las horas de toma
     const [hora, minuto] = medicamento.primeraToma.split(':');
@@ -256,15 +291,22 @@ export const crearEventosRecurrentes = async (accessToken, medicamento) => {
     }
 
     // Crear eventos para cada día del tratamiento
-    for (let dia = 0; dia < (medicamento.diasTratamiento || 30); dia++) {
+    // Limitar a 100 eventos por vez para evitar sobrecarga de la API
+    const maxEventos = 100;
+    let eventosCreados = 0;
+    
+    for (let dia = 0; dia < diasTratamiento && eventosCreados < maxEventos; dia++) {
       const fecha = new Date(fechaHoy);
       fecha.setDate(fecha.getDate() + dia);
       const fechaStr = fecha.toISOString().split('T')[0];
 
       for (const horaToma of horasToma) {
+        if (eventosCreados >= maxEventos) break;
+        
         const resultado = await crearEventoToma(accessToken, medicamento, fechaStr, horaToma);
         if (resultado.success) {
           eventos.push(resultado.eventoId);
+          eventosCreados++;
         }
       }
     }

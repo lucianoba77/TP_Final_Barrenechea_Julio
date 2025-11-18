@@ -115,10 +115,15 @@ export const iniciarSesion = async (email, password) => {
       };
 
       // Si es asistente, agregar información del paciente
+      // Priorizar pacienteId del documento de usuarios (más confiable)
       if (asistenteResult.success && asistenteResult.esAsistente) {
         usuarioFinal.role = 'asistente';
-        usuarioFinal.pacienteId = asistenteResult.pacienteId || usuarioData.pacienteId;
+        usuarioFinal.pacienteId = usuarioData.pacienteId || asistenteResult.pacienteId;
         usuarioFinal.paciente = asistenteResult.paciente;
+      } else if (usuarioData.role === 'asistente' && usuarioData.pacienteId) {
+        // Si el documento ya tiene role 'asistente', usar esos datos
+        usuarioFinal.role = 'asistente';
+        usuarioFinal.pacienteId = usuarioData.pacienteId;
       }
 
       return {
@@ -342,12 +347,19 @@ export const observarEstadoAuth = (callback) => {
               return;
             }
             
+            // Asegurar que el pacienteId esté presente
+            // Priorizar pacienteId del documento de usuarios (más confiable)
+            const pacienteIdFinal = usuarioData.pacienteId || asistenteResult.pacienteId;
+            if (!pacienteIdFinal) {
+              console.error('ERROR: Asistente sin pacienteId. No puede ver medicamentos.');
+            }
+            
             callback({
               id: user.uid,
               email: user.email,
               nombre: user.displayName || usuarioData.nombre,
               role: 'asistente',
-              pacienteId: asistenteResult.pacienteId || usuarioData.pacienteId,
+              pacienteId: pacienteIdFinal,
               paciente: asistenteResult.paciente,
               ...usuarioData
             });
@@ -377,14 +389,31 @@ export const observarEstadoAuth = (callback) => {
                 return;
               }
               
-              callback({
-                id: user.uid,
-                email: user.email,
-                nombre: user.displayName || user.email.split('@')[0],
-                role: 'asistente',
-                pacienteId: asistenteResult.pacienteId,
-                paciente: asistenteResult.paciente
-              });
+              // Crear documento en usuarios si no existe
+              const pacienteIdFinal = asistenteResult.pacienteId;
+              if (pacienteIdFinal) {
+                const nuevoUsuarioData = {
+                  id: user.uid,
+                  email: user.email,
+                  nombre: user.displayName || user.email.split('@')[0],
+                  role: 'asistente',
+                  pacienteId: pacienteIdFinal,
+                  tipoSuscripcion: 'gratis',
+                  esPremium: false,
+                  fechaCreacion: new Date().toISOString(),
+                  ultimaSesion: new Date().toISOString()
+                };
+                
+                // Crear documento en usuarios
+                await setDoc(doc(db, 'usuarios', user.uid), nuevoUsuarioData);
+                
+                callback({
+                  ...nuevoUsuarioData,
+                  paciente: asistenteResult.paciente
+                });
+              } else {
+                callback(null);
+              }
             } else {
               callback(null);
             }

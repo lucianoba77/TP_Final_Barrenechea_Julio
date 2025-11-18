@@ -27,9 +27,7 @@ export const obtenerMedicamentos = async (userId) => {
       throw new Error('Firestore no está disponible');
     }
 
-    // Validar que userId no sea undefined o null
     if (!userId) {
-      console.warn('No se pueden obtener medicamentos: userId no está definido');
       return {
         success: false,
         error: 'Usuario no identificado',
@@ -40,8 +38,7 @@ export const obtenerMedicamentos = async (userId) => {
     const medicamentosRef = collection(db, 'medicamentos');
     const q = query(
       medicamentosRef,
-      where('userId', '==', userId),
-      orderBy('primeraToma', 'asc')
+      where('userId', '==', userId)
     );
 
     const querySnapshot = await getDocs(q);
@@ -52,6 +49,13 @@ export const obtenerMedicamentos = async (userId) => {
         id: doc.id,
         ...doc.data()
       });
+    });
+
+    // Ordenar manualmente por primeraToma
+    medicamentos.sort((a, b) => {
+      const horaA = a.primeraToma || '00:00';
+      const horaB = b.primeraToma || '00:00';
+      return horaA.localeCompare(horaB);
     });
 
     return {
@@ -163,7 +167,6 @@ export const agregarMedicamento = async (userId, medicamentoData) => {
       }
     } catch (calendarError) {
       // Si falla la sincronización con Google Calendar, no es crítico
-      console.warn('Error al sincronizar con Google Calendar:', calendarError);
     }
 
     return {
@@ -249,7 +252,6 @@ export const actualizarMedicamento = async (medicamentoId, datosActualizados) =>
           }
         }
       } catch (calendarError) {
-        console.warn('No se pudieron actualizar eventos de Google Calendar:', calendarError);
       }
     }
     
@@ -424,7 +426,6 @@ export const eliminarMedicamento = async (medicamentoId) => {
             }
           }
         } catch (calendarError) {
-          console.warn('No se pudieron eliminar eventos de Google Calendar:', calendarError);
         }
       }
     }
@@ -547,7 +548,6 @@ export const eliminarTodosLosMedicamentos = async (userId) => {
             }
           }
         } catch (calendarError) {
-          console.warn('No se pudieron eliminar eventos de Google Calendar:', calendarError);
         }
       }
 
@@ -573,35 +573,19 @@ export const eliminarTodosLosMedicamentos = async (userId) => {
  */
 export const suscribirMedicamentos = (userId, callback) => {
   if (!db) {
-    console.warn('Firestore no está disponible');
     return () => {};
   }
 
-  // Validar que userId no sea undefined o null
   if (!userId) {
-    console.warn('No se puede suscribir a medicamentos: userId no está definido');
     callback([]);
     return () => {};
   }
 
   const medicamentosRef = collection(db, 'medicamentos');
-  
-  // Intentar con orderBy primero, si falla usar solo where
-  let q;
-  try {
-    q = query(
-      medicamentosRef,
-      where('userId', '==', userId),
-      orderBy('primeraToma', 'asc')
-    );
-  } catch (error) {
-    // Si falla el orderBy (por ejemplo, falta índice compuesto), usar solo where
-    console.warn('No se pudo usar orderBy, usando solo where:', error);
-    q = query(
-      medicamentosRef,
-      where('userId', '==', userId)
-    );
-  }
+  const q = query(
+    medicamentosRef,
+    where('userId', '==', userId)
+  );
 
   return onSnapshot(q, (querySnapshot) => {
     const medicamentos = [];
@@ -611,7 +595,7 @@ export const suscribirMedicamentos = (userId, callback) => {
         ...doc.data()
       });
     });
-    // Ordenar manualmente si no se pudo usar orderBy
+    // Ordenar manualmente por primeraToma
     medicamentos.sort((a, b) => {
       const horaA = a.primeraToma || '00:00';
       const horaB = b.primeraToma || '00:00';
@@ -620,32 +604,6 @@ export const suscribirMedicamentos = (userId, callback) => {
     callback(medicamentos);
   }, (error) => {
     console.error('Error en suscripción de medicamentos:', error);
-    // Si el error es por índice faltante, intentar sin orderBy
-    if (error.code === 'failed-precondition' || error.message.includes('index')) {
-      console.warn('Intentando suscripción sin orderBy debido a índice faltante');
-      const qSimple = query(
-        medicamentosRef,
-        where('userId', '==', userId)
-      );
-      return onSnapshot(qSimple, (querySnapshot) => {
-        const medicamentos = [];
-        querySnapshot.forEach((doc) => {
-          medicamentos.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-        medicamentos.sort((a, b) => {
-          const horaA = a.primeraToma || '00:00';
-          const horaB = b.primeraToma || '00:00';
-          return horaA.localeCompare(horaB);
-        });
-        callback(medicamentos);
-      }, (error2) => {
-        console.error('Error en suscripción simple de medicamentos:', error2);
-        callback([]);
-      });
-    }
     callback([]);
   });
 };
