@@ -27,6 +27,16 @@ export const obtenerMedicamentos = async (userId) => {
       throw new Error('Firestore no está disponible');
     }
 
+    // Validar que userId no sea undefined o null
+    if (!userId) {
+      console.warn('No se pueden obtener medicamentos: userId no está definido');
+      return {
+        success: false,
+        error: 'Usuario no identificado',
+        medicamentos: []
+      };
+    }
+
     const medicamentosRef = collection(db, 'medicamentos');
     const q = query(
       medicamentosRef,
@@ -101,10 +111,29 @@ export const agregarMedicamento = async (userId, medicamentoData) => {
       throw new Error('Firestore no está disponible');
     }
 
+    // Asegurar que stockInicial y stockActual sean números
+    // Convertir explícitamente a número y asegurar que no sea NaN
+    const stockInicial = medicamentoData.stockInicial !== undefined && medicamentoData.stockInicial !== null
+      ? Number(medicamentoData.stockInicial)
+      : 0;
+    const stockActual = isNaN(stockInicial) ? 0 : stockInicial; // Al crear, stockActual = stockInicial
+
+    // Crear el objeto sin hacer spread primero para evitar valores incorrectos
     const medicamentoCompleto = {
-      ...medicamentoData,
+      nombre: medicamentoData.nombre,
+      presentacion: medicamentoData.presentacion,
+      tomasDiarias: Number(medicamentoData.tomasDiarias) ?? 1,
+      primeraToma: medicamentoData.primeraToma,
+      afeccion: medicamentoData.afeccion,
+      stockInicial: stockInicial, // Guardar el valor correcto
+      stockActual: stockActual, // Al crear, ambos son iguales
+      diasTratamiento: Number(medicamentoData.diasTratamiento) ?? 0,
+      esCronico: medicamentoData.esCronico || false,
+      alarmasActivas: medicamentoData.alarmasActivas !== undefined ? medicamentoData.alarmasActivas : true,
+      detalles: medicamentoData.detalles || '',
+      fechaVencimiento: medicamentoData.fechaVencimiento || '',
+      color: medicamentoData.color,
       userId,
-      stockActual: medicamentoData.stockInicial || medicamentoData.stockActual,
       tomasRealizadas: medicamentoData.tomasRealizadas || [],
       activo: medicamentoData.activo !== undefined ? medicamentoData.activo : true,
       fechaCreacion: new Date().toISOString(),
@@ -162,6 +191,22 @@ export const actualizarMedicamento = async (medicamentoId, datosActualizados) =>
       throw new Error('Firestore no está disponible');
     }
 
+    // Asegurar que stockInicial y stockActual sean números si se están actualizando
+    if (datosActualizados.stockInicial !== undefined) {
+      datosActualizados.stockInicial = Number(datosActualizados.stockInicial) || 0;
+      
+      // Si se actualiza stockInicial y no se está actualizando stockActual explícitamente,
+      // actualizar stockActual al nuevo valor de stockInicial
+      if (datosActualizados.stockActual === undefined) {
+        datosActualizados.stockActual = datosActualizados.stockInicial;
+      }
+    }
+    
+    // Asegurar que stockActual sea un número si se está actualizando
+    if (datosActualizados.stockActual !== undefined) {
+      datosActualizados.stockActual = Number(datosActualizados.stockActual) || 0;
+    }
+    
     const medicamentoRef = doc(db, 'medicamentos', medicamentoId);
     const medicamentoSnap = await getDoc(medicamentoRef);
     
@@ -180,7 +225,7 @@ export const actualizarMedicamento = async (medicamentoId, datosActualizados) =>
     
     if (horarioCambio && medicamentoActual.eventoIdsGoogleCalendar && medicamentoActual.eventoIdsGoogleCalendar.length > 0) {
       try {
-        const { obtenerTokenGoogle, actualizarEventoToma, eliminarEventoToma } = await import('./calendarService');
+        const { obtenerTokenGoogle, eliminarEventoToma } = await import('./calendarService');
         const tokenData = await obtenerTokenGoogle(medicamentoActual.userId);
         
         if (tokenData && tokenData.access_token) {
@@ -218,6 +263,131 @@ export const actualizarMedicamento = async (medicamentoId, datosActualizados) =>
     };
   } catch (error) {
     console.error('Error al actualizar medicamento:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Resta una unidad del stock de un medicamento
+ * Para medicamentos ocasionales, también registra la toma en tomasRealizadas
+ */
+export const restarStockMedicamento = async (medicamentoId) => {
+  try {
+    if (!db) {
+      throw new Error('Firestore no está disponible');
+    }
+
+    const medicamentoRef = doc(db, 'medicamentos', medicamentoId);
+    const medicamentoSnap = await getDoc(medicamentoRef);
+    
+    if (!medicamentoSnap.exists()) {
+      return {
+        success: false,
+        error: 'Medicamento no encontrado'
+      };
+    }
+
+    const medicamentoData = medicamentoSnap.data();
+
+    const stockActual = Number(medicamentoData.stockActual) || 0;
+    
+    if (stockActual <= 0) {
+      return {
+        success: false,
+        error: 'No hay stock disponible para restar'
+      };
+    }
+
+    const nuevoStock = Math.max(0, stockActual - 1);
+    
+    // Si es un medicamento ocasional (tomasDiarias === 0), registrar la toma
+    const esOcasional = medicamentoData.tomasDiarias === 0;
+    const datosActualizados = {
+      stockActual: nuevoStock,
+      fechaActualizacion: new Date().toISOString()
+    };
+
+    if (esOcasional) {
+      // Registrar la toma para medicamentos ocasionales
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const horaActual = new Date().toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+      
+      const nuevaToma = {
+        fecha: fechaHoy,
+        hora: horaActual,
+        tomada: true,
+        tipo: 'ocasional'
+      };
+
+      const tomasActualizadas = [...(medicamentoData.tomasRealizadas || []), nuevaToma];
+      datosActualizados.tomasRealizadas = tomasActualizadas;
+    }
+
+    await updateDoc(medicamentoRef, datosActualizados);
+
+    return {
+      success: true,
+      stockActual: nuevoStock,
+      tomaRegistrada: esOcasional
+    };
+  } catch (error) {
+    console.error('Error al restar stock:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Agrega stock a un medicamento ocasional y solicita fecha de vencimiento
+ */
+export const agregarStockOcasional = async (medicamentoId, cantidad, fechaVencimiento) => {
+  try {
+    if (!db) {
+      throw new Error('Firestore no está disponible');
+    }
+
+    if (!fechaVencimiento) {
+      return {
+        success: false,
+        error: 'La fecha de vencimiento es requerida cuando se agrega stock'
+      };
+    }
+
+    const medicamentoRef = doc(db, 'medicamentos', medicamentoId);
+    const medicamentoSnap = await getDoc(medicamentoRef);
+    
+    if (!medicamentoSnap.exists()) {
+      return {
+        success: false,
+        error: 'Medicamento no encontrado'
+      };
+    }
+
+    const medicamentoData = medicamentoSnap.data();
+    const stockActual = Number(medicamentoData.stockActual) || 0;
+    const stockInicial = Number(medicamentoData.stockInicial) || 0;
+    const nuevoStock = stockActual + Number(cantidad);
+    const nuevoStockInicial = stockInicial + Number(cantidad);
+
+    await updateDoc(medicamentoRef, {
+      stockActual: nuevoStock,
+      stockInicial: nuevoStockInicial,
+      fechaVencimiento: fechaVencimiento,
+      fechaActualizacion: new Date().toISOString()
+    });
+
+    return {
+      success: true,
+      stockActual: nuevoStock,
+      stockInicial: nuevoStockInicial
+    };
+  } catch (error) {
+    console.error('Error al agregar stock:', error);
     return {
       success: false,
       error: error.message
@@ -295,6 +465,19 @@ export const marcarTomaRealizada = async (medicamentoId, hora) => {
     const medicamento = medicamentoDoc.data();
     const fecha = new Date().toISOString().split('T')[0];
     
+    // Asegurar que stockActual sea un número válido
+    const stockActualActual = medicamento.stockActual !== undefined && medicamento.stockActual !== null
+      ? Number(medicamento.stockActual)
+      : (medicamento.stockInicial !== undefined ? Number(medicamento.stockInicial) : 0);
+    
+    // Verificar si hay stock disponible
+    if (stockActualActual <= 0) {
+      return {
+        success: false,
+        error: 'No hay stock disponible para marcar esta toma'
+      };
+    }
+    
     const nuevaToma = {
       fecha,
       hora,
@@ -303,11 +486,12 @@ export const marcarTomaRealizada = async (medicamentoId, hora) => {
     };
 
     const tomasActualizadas = [...(medicamento.tomasRealizadas || []), nuevaToma];
-    const stockActual = Math.max(0, (medicamento.stockActual || medicamento.stockInicial) - 1);
+    // Restar 1 del stock actual, asegurando que no sea menor a 0
+    const nuevoStockActual = Math.max(0, stockActualActual - 1);
 
     await updateDoc(doc(db, 'medicamentos', medicamentoId), {
       tomasRealizadas: tomasActualizadas,
-      stockActual,
+      stockActual: nuevoStockActual,
       fechaActualizacion: new Date().toISOString()
     });
 
@@ -325,6 +509,66 @@ export const marcarTomaRealizada = async (medicamentoId, hora) => {
 };
 
 /**
+ * Elimina todos los medicamentos de un usuario
+ */
+export const eliminarTodosLosMedicamentos = async (userId) => {
+  try {
+    if (!db) {
+      throw new Error('Firestore no está disponible');
+    }
+
+    if (!userId) {
+      throw new Error('Usuario no identificado');
+    }
+
+    // Obtener todos los medicamentos del usuario
+    const medicamentosRef = collection(db, 'medicamentos');
+    const q = query(
+      medicamentosRef,
+      where('userId', '==', userId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const eliminaciones = [];
+
+    // Eliminar cada medicamento
+    for (const docSnapshot of querySnapshot.docs) {
+      const medicamentoData = docSnapshot.data();
+      
+      // Eliminar eventos de Google Calendar si existen
+      if (medicamentoData.eventoIdsGoogleCalendar && medicamentoData.eventoIdsGoogleCalendar.length > 0) {
+        try {
+          const { obtenerTokenGoogle, eliminarEventoToma } = await import('./calendarService');
+          const tokenData = await obtenerTokenGoogle(userId);
+          
+          if (tokenData && tokenData.access_token) {
+            for (const eventoId of medicamentoData.eventoIdsGoogleCalendar) {
+              await eliminarEventoToma(tokenData.access_token, eventoId);
+            }
+          }
+        } catch (calendarError) {
+          console.warn('No se pudieron eliminar eventos de Google Calendar:', calendarError);
+        }
+      }
+
+      await deleteDoc(doc(db, 'medicamentos', docSnapshot.id));
+      eliminaciones.push(docSnapshot.id);
+    }
+
+    return {
+      success: true,
+      eliminados: eliminaciones.length
+    };
+  } catch (error) {
+    console.error('Error al eliminar todos los medicamentos:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
  * Suscribe a cambios en tiempo real de los medicamentos de un usuario
  */
 export const suscribirMedicamentos = (userId, callback) => {
@@ -333,12 +577,31 @@ export const suscribirMedicamentos = (userId, callback) => {
     return () => {};
   }
 
+  // Validar que userId no sea undefined o null
+  if (!userId) {
+    console.warn('No se puede suscribir a medicamentos: userId no está definido');
+    callback([]);
+    return () => {};
+  }
+
   const medicamentosRef = collection(db, 'medicamentos');
-  const q = query(
-    medicamentosRef,
-    where('userId', '==', userId),
-    orderBy('primeraToma', 'asc')
-  );
+  
+  // Intentar con orderBy primero, si falla usar solo where
+  let q;
+  try {
+    q = query(
+      medicamentosRef,
+      where('userId', '==', userId),
+      orderBy('primeraToma', 'asc')
+    );
+  } catch (error) {
+    // Si falla el orderBy (por ejemplo, falta índice compuesto), usar solo where
+    console.warn('No se pudo usar orderBy, usando solo where:', error);
+    q = query(
+      medicamentosRef,
+      where('userId', '==', userId)
+    );
+  }
 
   return onSnapshot(q, (querySnapshot) => {
     const medicamentos = [];
@@ -348,9 +611,41 @@ export const suscribirMedicamentos = (userId, callback) => {
         ...doc.data()
       });
     });
+    // Ordenar manualmente si no se pudo usar orderBy
+    medicamentos.sort((a, b) => {
+      const horaA = a.primeraToma || '00:00';
+      const horaB = b.primeraToma || '00:00';
+      return horaA.localeCompare(horaB);
+    });
     callback(medicamentos);
   }, (error) => {
     console.error('Error en suscripción de medicamentos:', error);
+    // Si el error es por índice faltante, intentar sin orderBy
+    if (error.code === 'failed-precondition' || error.message.includes('index')) {
+      console.warn('Intentando suscripción sin orderBy debido a índice faltante');
+      const qSimple = query(
+        medicamentosRef,
+        where('userId', '==', userId)
+      );
+      return onSnapshot(qSimple, (querySnapshot) => {
+        const medicamentos = [];
+        querySnapshot.forEach((doc) => {
+          medicamentos.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+        medicamentos.sort((a, b) => {
+          const horaA = a.primeraToma || '00:00';
+          const horaB = b.primeraToma || '00:00';
+          return horaA.localeCompare(horaB);
+        });
+        callback(medicamentos);
+      }, (error2) => {
+        console.error('Error en suscripción simple de medicamentos:', error2);
+        callback([]);
+      });
+    }
     callback([]);
   });
 };

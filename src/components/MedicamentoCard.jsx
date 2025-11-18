@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMed } from '../context/MedContext';
 import { useNotification } from '../context/NotificationContext';
+import { obtenerIconoPresentacion } from '../utils/presentacionIcons';
 import './MedicamentoCard.css';
 
 const MedicamentoCard = ({ medicamento, tipoVista = 'dashboard' }) => {
@@ -8,24 +9,32 @@ const MedicamentoCard = ({ medicamento, tipoVista = 'dashboard' }) => {
   const { showSuccess, showError } = useNotification();
 
   // Calcular porcentaje de stock
-  const porcentajeStock = (medicamento.stockActual / medicamento.stockInicial) * 100;
+  const porcentajeStock = medicamento.stockInicial > 0
+    ? Math.max(0, Math.min(100, (medicamento.stockActual / medicamento.stockInicial) * 100))
+    : 0;
 
   // Función para calcular el color de la barra según la hora
   const obtenerColorBarra = (tomaNumero) => {
     const fechaActual = new Date();
     const horaActual = fechaActual.getHours() * 60 + fechaActual.getMinutes();
     
-    // Calcular la hora de la toma
+    // Calcular la hora específica de esta toma
     const [hora, minuto] = medicamento.primeraToma.split(':');
     const horaPrimeraToma = parseInt(hora) * 60 + parseInt(minuto);
-    const horaToma = horaPrimeraToma + ((tomaNumero - 1) * (24 * 60 / medicamento.tomasDiarias));
+    const intervaloEntreTomas = (24 * 60) / medicamento.tomasDiarias;
+    const horaToma = horaPrimeraToma + ((tomaNumero - 1) * intervaloEntreTomas);
+    
+    // Convertir la hora de la toma a formato HH:MM para comparar
+    const horasToma = Math.floor(horaToma / 60) % 24;
+    const minutosToma = horaToma % 60;
+    const horaTomaFormato = `${String(horasToma).padStart(2, '0')}:${String(minutosToma).padStart(2, '0')}`;
     
     const diferencia = horaActual - horaToma;
     
-    // Verificar si ya fue tomada
+    // Verificar si esta toma específica ya fue tomada
     const fechaHoy = new Date().toISOString().split('T')[0];
     const tomaRealizada = medicamento.tomasRealizadas.find(
-      toma => toma.fecha === fechaHoy && toma.hora === medicamento.primeraToma
+      toma => toma.fecha === fechaHoy && toma.hora === horaTomaFormato
     );
     
     if (tomaRealizada && tomaRealizada.tomada) {
@@ -47,10 +56,21 @@ const MedicamentoCard = ({ medicamento, tipoVista = 'dashboard' }) => {
    * Maneja el evento de marcar una toma como realizada
    * Registra la toma en el historial y actualiza el stock del medicamento
    */
-  const marcarToma = async () => {
-    const resultado = await marcarTomaContext(medicamento.id, medicamento.primeraToma);
+  const marcarToma = async (tomaNumero) => {
+    // Calcular la hora específica de esta toma
+    const [hora, minuto] = medicamento.primeraToma.split(':');
+    const horaPrimeraToma = parseInt(hora) * 60 + parseInt(minuto);
+    const intervaloEntreTomas = (24 * 60) / medicamento.tomasDiarias;
+    const horaToma = horaPrimeraToma + ((tomaNumero - 1) * intervaloEntreTomas);
+    
+    // Convertir la hora de la toma a formato HH:MM
+    const horasToma = Math.floor(horaToma / 60) % 24;
+    const minutosToma = horaToma % 60;
+    const horaTomaFormato = `${String(horasToma).padStart(2, '0')}:${String(minutosToma).padStart(2, '0')}`;
+    
+    const resultado = await marcarTomaContext(medicamento.id, horaTomaFormato);
     if (resultado.success) {
-      showSuccess(`✅ ${medicamento.nombre} marcado como tomado`);
+      showSuccess(`✅ ${medicamento.nombre} - Toma #${tomaNumero} marcada como tomada`);
     } else {
       showError(resultado.error || 'Error al marcar la toma');
     }
@@ -58,10 +78,14 @@ const MedicamentoCard = ({ medicamento, tipoVista = 'dashboard' }) => {
 
   // Obtener ícono según presentación
   const obtenerIcono = () => {
-    if (medicamento.presentacion === 'inyeccion') {
-      return '💉';
-    }
-    return '💊';
+    return obtenerIconoPresentacion(medicamento.presentacion);
+  };
+
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'Sin registrar';
+    const date = new Date(fecha);
+    if (Number.isNaN(date.getTime())) return 'Sin registrar';
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   return (
@@ -78,7 +102,11 @@ const MedicamentoCard = ({ medicamento, tipoVista = 'dashboard' }) => {
               className="med-icon"
               style={{ backgroundColor: medicamento.color }}
             >
-              {obtenerIcono()}
+              <img 
+                src={obtenerIcono()} 
+                alt={medicamento.presentacion || 'medicamento'} 
+                className="med-icon-image"
+              />
             </div>
             <div className="med-info">
               <h3 className="med-nombre">{medicamento.nombre}</h3>
@@ -113,13 +141,58 @@ const MedicamentoCard = ({ medicamento, tipoVista = 'dashboard' }) => {
             <>
               <button 
                 className="btn-marcar"
-                onClick={marcarToma}
-                style={{ backgroundColor: medicamento.color }}
+                onClick={() => {
+                  // Encontrar la próxima toma pendiente
+                  const fechaHoy = new Date().toISOString().split('T')[0];
+                  let proximaTomaPendiente = null;
+                  
+                  for (let i = 1; i <= medicamento.tomasDiarias; i++) {
+                    const [hora, minuto] = medicamento.primeraToma.split(':');
+                    const horaPrimeraToma = parseInt(hora) * 60 + parseInt(minuto);
+                    const intervaloEntreTomas = (24 * 60) / medicamento.tomasDiarias;
+                    const horaToma = horaPrimeraToma + ((i - 1) * intervaloEntreTomas);
+                    const horasToma = Math.floor(horaToma / 60) % 24;
+                    const minutosToma = horaToma % 60;
+                    const horaTomaFormato = `${String(horasToma).padStart(2, '0')}:${String(minutosToma).padStart(2, '0')}`;
+                    
+                    const yaTomada = medicamento.tomasRealizadas?.find(
+                      toma => toma.fecha === fechaHoy && toma.hora === horaTomaFormato && toma.tomada
+                    );
+                    
+                    if (!yaTomada) {
+                      proximaTomaPendiente = i;
+                      break;
+                    }
+                  }
+                  
+                  if (proximaTomaPendiente) {
+                    marcarToma(proximaTomaPendiente);
+                  } else {
+                    showSuccess(`✅ Todas las tomas de ${medicamento.nombre} ya fueron marcadas hoy`);
+                  }
+                }}
+                disabled={medicamento.stockActual <= 0}
+                style={{ 
+                  backgroundColor: medicamento.color,
+                  opacity: medicamento.stockActual <= 0 ? 0.5 : 1,
+                  cursor: medicamento.stockActual <= 0 ? 'not-allowed' : 'pointer'
+                }}
               >
-                ✓ Marcar como tomado
+                {medicamento.stockActual <= 0 ? 'Sin stock disponible' : '✓ Marcar como tomado'}
               </button>
               <div className="stock-info">
-                Stock disponible: <strong>{medicamento.stockActual} de {medicamento.stockInicial}</strong>
+                {medicamento.stockInicial > 0 ? (
+                  <>
+                    Stock disponible: <strong>{medicamento.stockActual} de {medicamento.diasTratamiento || medicamento.stockInicial}</strong>
+                    <br />
+                  </>
+                ) : (
+                  <>
+                    <strong>Sin stock disponible</strong>
+                    <br />
+                  </>
+                )}
+                Vence: <strong>{formatearFecha(medicamento.fechaVencimiento)}</strong>
               </div>
             </>
           )}

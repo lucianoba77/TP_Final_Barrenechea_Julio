@@ -4,7 +4,7 @@
  */
 
 import { auth, db } from '../config/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 /**
  * Verifica la configuración de Firebase
@@ -55,7 +55,7 @@ export const verificarFirestore = async () => {
     // Eso es normal y esperado
     try {
       // Intentar leer una colección que existe o puede no existir
-      const colecciones = await getDocs(collection(db, 'usuarios'));
+      await getDocs(collection(db, 'usuarios'));
       resultados.conectado = true;
       resultados.puedeLeer = true;
     } catch (error) {

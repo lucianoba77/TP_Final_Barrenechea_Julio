@@ -2,19 +2,55 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMed } from '../context/MedContext';
 import { useNotification } from '../context/NotificationContext';
+import { obtenerIconoPresentacion } from '../utils/presentacionIcons';
 import MainMenu from '../components/MainMenu';
+import UserMenu from '../components/UserMenu';
 import './BotiquinScreen.css';
 
 const BotiquinScreen = () => {
   const navigate = useNavigate();
-  const { medicamentos, eliminarMedicina, suspenderMedicina } = useMed();
+  const { medicamentos, eliminarMedicina, suspenderMedicina, restarStock } = useMed();
   const { showConfirm, showSuccess, showError } = useNotification();
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'Sin registrar';
+    const date = new Date(fecha);
+    if (Number.isNaN(date.getTime())) return 'Sin registrar';
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const calcularPorcentajeStock = (medicamento) => {
+    if (!medicamento || !medicamento.stockInicial || medicamento.stockInicial <= 0) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, (medicamento.stockActual / medicamento.stockInicial) * 100));
+  };
+
+  const obtenerTextoStock = (medicamento) => {
+    if (!medicamento || medicamento.stockActual === undefined || medicamento.stockActual === null) {
+      return 'Sin stock disponible';
+    }
+    
+    const stockActual = Number(medicamento.stockActual) || 0;
+    
+    if (stockActual <= 0) {
+      return 'Sin stock disponible';
+    }
+    
+    // Si tiene días de tratamiento, mostrar "stock de días"
+    // Si no tiene días de tratamiento (medicamento ocasional), mostrar solo el número
+    if (medicamento.diasTratamiento && medicamento.diasTratamiento > 0) {
+      return `${stockActual} de ${medicamento.diasTratamiento}`;
+    } else {
+      // Medicamento ocasional: mostrar solo la cantidad restante
+      return `${stockActual}`;
+    }
+  };
 
   return (
     <div className="botiquin-screen">
       <div className="botiquin-header">
         <button className="btn-home" onClick={() => navigate('/dashboard')}>🏠</button>
         <h1>Mi Botiquín</h1>
+        <UserMenu />
       </div>
 
       <div className="botiquin-content">
@@ -29,7 +65,11 @@ const BotiquinScreen = () => {
               <div key={medicamento.id} className="medicamento-card-container">
                 <div className="med-card-header">
                   <div className="med-icon-circle" style={{ backgroundColor: medicamento.color }}>
-                    {medicamento.presentacion === 'inyeccion' ? '💉' : '💊'}
+                    <img 
+                      src={obtenerIconoPresentacion(medicamento.presentacion)} 
+                      alt={medicamento.presentacion || 'medicamento'} 
+                      className="med-icon-image"
+                    />
                   </div>
                   <div className="med-title-section">
                     <h3 className="med-nombre">{medicamento.nombre}</h3>
@@ -46,15 +86,37 @@ const BotiquinScreen = () => {
                   </div>
                   <div className="detail-row">
                     <span className="detail-label">Tomas diarias:</span>
-                    <span className="detail-value">{medicamento.tomasDiarias}</span>
+                    <span className="detail-value">
+                      {medicamento.tomasDiarias === 0 ? (
+                        <span style={{ color: '#FF9800', fontWeight: '600' }}>
+                          0 (Ocasional)
+                        </span>
+                      ) : (
+                        medicamento.tomasDiarias
+                      )}
+                    </span>
                   </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Primera toma:</span>
-                    <span className="detail-value">{medicamento.primeraToma}</span>
-                  </div>
+                  {medicamento.tomasDiarias > 0 && (
+                    <div className="detail-row">
+                      <span className="detail-label">Primera toma:</span>
+                      <span className="detail-value">{medicamento.primeraToma || 'Sin programar'}</span>
+                    </div>
+                  )}
+                  {medicamento.tomasDiarias === 0 && (
+                    <div className="detail-row reminder-badge">
+                      <span className="detail-label">💊 Uso:</span>
+                      <span className="detail-value" style={{ color: '#FF9800', fontWeight: '600' }}>
+                        Ocasional (según necesidad)
+                      </span>
+                    </div>
+                  )}
                   <div className="detail-row">
                     <span className="detail-label">Condición:</span>
                     <span className="detail-value">{medicamento.afeccion}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Vence:</span>
+                    <span className="detail-value">{formatearFecha(medicamento.fechaVencimiento)}</span>
                   </div>
                   
                   <div className="stock-row">
@@ -63,16 +125,43 @@ const BotiquinScreen = () => {
                       <div 
                         className="stock-bar"
                         style={{ 
-                          width: `${(medicamento.stockActual / medicamento.stockInicial) * 100}%`,
-                          backgroundColor: medicamento.stockActual <= 7 ? '#f44336' : '#4CAF50'
+                          width: `${calcularPorcentajeStock(medicamento)}%`,
+                          backgroundColor: medicamento.stockInicial <= 0
+                            ? '#B0BEC5'
+                            : medicamento.stockActual <= 7 ? '#f44336' : '#4CAF50'
                         }}
                       />
                     </div>
-                    <span className="stock-text">{medicamento.stockActual} de {medicamento.stockInicial}</span>
+                    <span className="stock-text">{obtenerTextoStock(medicamento)}</span>
                   </div>
+                  
+                  {/* Botón de restar stock para medicamentos ocasionales */}
+                  {medicamento.tomasDiarias === 0 && medicamento.stockActual > 0 && (
+                    <div className="stock-actions">
+                      <button
+                        className="btn-restar-stock"
+                        onClick={async () => {
+                          const resultado = await restarStock(medicamento.id);
+                          if (resultado.success) {
+                            showSuccess(`Stock actualizado: ${resultado.stockActual} unidades restantes`);
+                          } else {
+                            showError(resultado.error || 'Error al restar stock');
+                          }
+                        }}
+                      >
+                        <span className="btn-restar-icon">−</span> Restar uno
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="med-actions">
+                  <button 
+                    className="btn-editar"
+                    onClick={() => navigate(`/nuevo?editar=${medicamento.id}`)}
+                  >
+                    ✏️ Editar
+                  </button>
                   <button 
                     className="btn-suspender"
                     onClick={async () => {

@@ -9,23 +9,17 @@
 .asistentes-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 24px;
   gap: 16px;
 }
 
-.asistentes-header h3 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #333;
-}
-
-.asistentes-header p {
+.asistentes-description {
   margin: 0;
   font-size: 14px;
   color: #666;
   line-height: 1.5;
+  flex: 1;
 }
 
 .btn-agregar-asistente {
@@ -268,11 +262,12 @@
 
   .asistentes-header {
     flex-direction: column;
+    align-items: flex-start;
     gap: var(--spacing-md);
   }
 
-  .asistentes-header h3 {
-    font-size: 18px;
+  .asistentes-description {
+    width: 100%;
   }
 
   .btn-agregar-asistente {

@@ -156,3 +156,6 @@ Asegúrate de que el scope `https://www.googleapis.com/auth/calendar.events` est
 
 Si después de seguir estos pasos aún tienes problemas, revisa la consola del navegador (F12) para ver errores específicos.
 
+
+
+

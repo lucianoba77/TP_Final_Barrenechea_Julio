@@ -85,3 +85,6 @@ service cloud.firestore {
 
 Esto permite que cualquier usuario autenticado lea y escriba en cualquier colección. Úsalo solo para desarrollo.
 
+
+
+

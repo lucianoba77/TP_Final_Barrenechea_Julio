@@ -1,17 +1,24 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMed } from '../context/MedContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
-import { coloresMedicamento } from '../constants/colores';
+import { obtenerColorPorIndice } from '../constants/colores';
 import { esUsuarioPremium, obtenerMensajeLimite } from '../utils/subscription';
+import { obtenerMedicamento } from '../services/medicamentosService';
+import UserMenu from '../components/UserMenu';
+import MainMenu from '../components/MainMenu';
 import './NuevaMedicinaScreen.css';
 
 const NuevaMedicinaScreen = () => {
   const navigate = useNavigate();
-  const { agregarMedicina, medicamentos } = useMed();
+  const [searchParams] = useSearchParams();
+  const medicamentoIdEditar = searchParams.get('editar');
+  const { agregarMedicina, editarMedicina, medicamentos } = useMed();
   const { usuarioActual } = useAuth();
   const { showSuccess, showError } = useNotification();
+  const [cargando, setCargando] = useState(false);
+  const [esEdicion, setEsEdicion] = useState(false);
   
   const [formData, setFormData] = useState({
     nombre: '',
@@ -19,15 +26,70 @@ const NuevaMedicinaScreen = () => {
     tomasDiarias: 1,
     primeraToma: '',
     afeccion: '',
-    stockInicial: 30,
-    color: '#FFFFFF',
-    diasTratamiento: 30,
+    stockInicial: 0,
+    color: obtenerColorPorIndice(medicamentos.length),
+    diasTratamiento: 0,
     esCronico: false,
     alarmasActivas: true,
-    detalles: ''
+    detalles: '',
+    fechaVencimiento: ''
   });
+  const [stockReferencia, setStockReferencia] = useState(null);
+  const [requiereFechaVencimiento, setRequiereFechaVencimiento] = useState(false);
 
-  const [colorSeleccionado, setColorSeleccionado] = useState('#FFFFFF');
+  // Cargar datos del medicamento si estamos editando
+  useEffect(() => {
+    const cargarMedicamento = async () => {
+      if (medicamentoIdEditar) {
+        setCargando(true);
+        setEsEdicion(true);
+        try {
+          const resultado = await obtenerMedicamento(medicamentoIdEditar);
+          if (resultado.success && resultado.medicamento) {
+            const med = resultado.medicamento;
+            setFormData({
+              nombre: med.nombre || '',
+              presentacion: med.presentacion || 'comprimidos',
+              tomasDiarias: med.tomasDiarias || 1,
+              primeraToma: med.primeraToma || '',
+              afeccion: med.afeccion || '',
+              // Al editar, mostrar el stock actual (lo que se ve en el botiquín) en lugar del stock inicial original
+              stockInicial: med.stockActual !== undefined && med.stockActual !== null 
+                ? med.stockActual 
+                : (med.stockInicial || 0),
+              color: med.color || obtenerColorPorIndice(medicamentos.length),
+              diasTratamiento: med.diasTratamiento || 0,
+              esCronico: med.esCronico || false,
+              alarmasActivas: med.alarmasActivas !== undefined ? med.alarmasActivas : true,
+              detalles: med.detalles || '',
+              fechaVencimiento: med.fechaVencimiento || ''
+            });
+            setStockReferencia(med.stockActual !== undefined ? Number(med.stockActual) : null);
+            setRequiereFechaVencimiento(false);
+          } else {
+            showError('No se pudo cargar el medicamento para editar');
+            navigate('/botiquin');
+          }
+        } catch (error) {
+          console.error('Error al cargar medicamento:', error);
+          showError('Error al cargar el medicamento');
+          navigate('/botiquin');
+        } finally {
+          setCargando(false);
+        }
+      } else {
+        // Si no es edición, actualizar el color según el número de medicamentos
+        setFormData(prev => ({
+          ...prev,
+          color: obtenerColorPorIndice(medicamentos.length)
+        }));
+        setStockReferencia(null);
+        setRequiereFechaVencimiento(false);
+      }
+    };
+
+    cargarMedicamento();
+  }, [medicamentoIdEditar, medicamentos.length, navigate, showError]);
 
   /**
    * Maneja los cambios en los campos del formulario
@@ -35,32 +97,89 @@ const NuevaMedicinaScreen = () => {
    */
   const cambioCampoFormulario = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    setFormData(prev => {
+      let nuevoValor = type === 'checkbox' 
+        ? checked 
+        : (type === 'number' ? (value === '' ? '' : Number(value)) : value);
+
+      const nuevoEstado = {
+        ...prev,
+        [name]: nuevoValor
+      };
+
+      if (name === 'stockInicial' && esEdicion && stockReferencia !== null) {
+        const valorNumerico = Number(nuevoValor) || 0;
+        if (valorNumerico > stockReferencia) {
+          nuevoEstado.fechaVencimiento = '';
+          setRequiereFechaVencimiento(true);
+        } else if (valorNumerico === stockReferencia) {
+          setRequiereFechaVencimiento(false);
+        } else {
+          setRequiereFechaVencimiento(false);
+        }
+      }
+
+      return nuevoEstado;
+    });
   };
 
-  /**
-   * Maneja la selección de color para el medicamento
-   * Actualiza tanto el estado local del color seleccionado como el estado del formulario
-   */
-  const seleccionColor = (color) => {
-    setColorSeleccionado(color.valor);
-    setFormData(prev => ({ ...prev, color: color.valor }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const tipoSuscripcion = esUsuarioPremium(usuarioActual) ? 'premium' : 'gratis';
-    const resultado = await agregarMedicina(formData, tipoSuscripcion);
+    if (formData.stockInicial < 0) {
+      showError('Ingresa un stock inicial válido');
+      return;
+    }
+
+    // Si tiene tomas diarias > 0, debe tener primera toma
+    // Si NO es crónico, también debe tener días de tratamiento
+    if (formData.tomasDiarias > 0) {
+      if (!formData.primeraToma) {
+        showError('Debes ingresar la hora de la primera toma');
+        return;
+      }
+      // Solo requerir días de tratamiento si NO es crónico
+      if (!formData.esCronico && (!formData.diasTratamiento || formData.diasTratamiento <= 0)) {
+        showError('Ingresa la cantidad de días de tratamiento');
+        return;
+      }
+    }
+
+    // Si tiene stock, debe tener fecha de vencimiento
+    if (formData.stockInicial > 0 && !formData.fechaVencimiento) {
+      showError('Debes ingresar la fecha de vencimiento del medicamento.');
+      return;
+    }
     
-    if (resultado.success) {
-      showSuccess(`${formData.nombre} ha sido agregado correctamente`);
-      navigate('/botiquin');
+    if (esEdicion && medicamentoIdEditar) {
+      // Modo edición
+      const resultado = await editarMedicina(medicamentoIdEditar, formData);
+      
+      if (resultado.success) {
+        showSuccess(`${formData.nombre} ha sido actualizado correctamente`);
+        navigate('/botiquin');
+      } else {
+        showError(resultado.error || 'Error al actualizar medicamento');
+      }
     } else {
-      showError(resultado.error || 'Error al agregar medicamento');
+      // Modo creación
+      // Asignar color automáticamente según el orden
+      const colorAsignado = obtenerColorPorIndice(medicamentos.length);
+      const formDataConColor = {
+        ...formData,
+        color: colorAsignado
+      };
+      
+      const tipoSuscripcion = esUsuarioPremium(usuarioActual) ? 'premium' : 'gratis';
+      const resultado = await agregarMedicina(formDataConColor, tipoSuscripcion);
+      
+      if (resultado.success) {
+        showSuccess(`${formData.nombre} ha sido agregado correctamente`);
+        navigate('/botiquin');
+      } else {
+        showError(resultado.error || 'Error al agregar medicamento');
+      }
     }
   };
 
@@ -70,16 +189,18 @@ const NuevaMedicinaScreen = () => {
   const mensajeLimite = !esPremium ? obtenerMensajeLimite(medicamentos.length) : '';
 
   const presentaciones = ['comprimidos', 'inyeccion', 'jarabe', 'gotas', 'crema', 'supositorio'];
+  const fechaVencimientoObligatoria = formData.stockInicial > 0 && (!esEdicion || stockReferencia === null || requiereFechaVencimiento);
 
   return (
     <div className="nueva-medicina-screen">
       <div className="nm-header">
         <button className="btn-back" onClick={() => navigate('/botiquin')}>🏠</button>
-        <h1>Nueva Medicina</h1>
+        <h1>{esEdicion ? 'Editar Medicina' : 'Nueva Medicina'}</h1>
+        <UserMenu />
       </div>
 
       <div className="nm-container">
-        {!puedeAgregar && (
+        {!esEdicion && !puedeAgregar && (
           <div className="limit-warning">
             <p>⚠️ {mensajeLimite}</p>
             <button 
@@ -127,21 +248,29 @@ const NuevaMedicinaScreen = () => {
                 name="tomasDiarias"
                 value={formData.tomasDiarias}
                 onChange={cambioCampoFormulario}
-                min="1"
+                min="0"
                 max="6"
                 required
               />
+              <p className="helper-text">
+                {formData.tomasDiarias === 0 
+                  ? 'Con 0 tomas, el medicamento solo aparecerá en el botiquín. Útil para medicamentos de uso ocasional (ej: analgésicos)'
+                  : 'Establece 0 si es un medicamento de uso ocasional que no tomas diariamente'}
+              </p>
             </div>
 
             <div className="form-group">
-              <label htmlFor="primeraToma">Primera toma</label>
+              <label htmlFor="primeraToma">
+                Primera toma {formData.tomasDiarias === 0 ? '(opcional)' : '*'}
+              </label>
               <input
                 type="time"
                 id="primeraToma"
                 name="primeraToma"
                 value={formData.primeraToma}
                 onChange={cambioCampoFormulario}
-                required
+                required={formData.tomasDiarias > 0}
+                disabled={formData.tomasDiarias === 0}
               />
             </div>
           </div>
@@ -167,26 +296,55 @@ const NuevaMedicinaScreen = () => {
                 name="stockInicial"
                 value={formData.stockInicial}
                 onChange={cambioCampoFormulario}
-                min="1"
+              min="0"
                 required
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="diasTratamiento">Días de tratamiento</label>
+              <label htmlFor="diasTratamiento">
+                Días de tratamiento {
+                  formData.tomasDiarias === 0 
+                    ? '(opcional)' 
+                    : formData.esCronico 
+                      ? '(no aplica - crónico)' 
+                      : '*'
+                }
+              </label>
               <input
                 type="number"
                 id="diasTratamiento"
                 name="diasTratamiento"
                 value={formData.diasTratamiento}
                 onChange={cambioCampoFormulario}
-                min="1"
-                required
+                min="0"
+                required={formData.tomasDiarias > 0 && !formData.esCronico}
+                disabled={formData.tomasDiarias === 0 || formData.esCronico}
               />
+              {formData.tomasDiarias === 0 && (
+                <p className="helper-text">
+                  Para medicamentos de uso ocasional, puedes dejar este campo en 0
+                </p>
+              )}
+              {formData.tomasDiarias > 0 && formData.esCronico && (
+                <p className="helper-text">
+                  Los medicamentos crónicos no tienen fin de tratamiento
+                </p>
+              )}
               <button
                 type="button"
                 className="btn-cronico"
-                onClick={() => setFormData(prev => ({ ...prev, esCronico: !prev.esCronico }))}
+                onClick={() => {
+                  setFormData(prev => {
+                    const nuevoEstado = { ...prev, esCronico: !prev.esCronico };
+                    // Si se marca como crónico, limpiar días de tratamiento
+                    if (nuevoEstado.esCronico) {
+                      nuevoEstado.diasTratamiento = 0;
+                    }
+                    return nuevoEstado;
+                  });
+                }}
+                disabled={formData.tomasDiarias === 0}
               >
                 {formData.esCronico ? 'Crónico ✓' : 'Crónico'}
               </button>
@@ -194,23 +352,25 @@ const NuevaMedicinaScreen = () => {
           </div>
 
           <div className="form-group">
-            <label>Color del medicamento</label>
-            <p className="color-description">
-              Selecciona el color que más se parezca a tu medicamento o envase
+            <label htmlFor="fechaVencimiento">Fecha de vencimiento</label>
+            <input
+              type="date"
+              id="fechaVencimiento"
+              name="fechaVencimiento"
+              value={formData.fechaVencimiento}
+              onChange={cambioCampoFormulario}
+              required={fechaVencimientoObligatoria}
+              min={new Date().toISOString().split('T')[0]}
+            />
+            <p className="helper-text">
+              {formData.stockInicial <= 0
+                ? 'Puedes guardar el medicamento sin stock; la fecha es opcional.'
+                : requiereFechaVencimiento
+                  ? 'Agregaste stock adicional. Ingresa la nueva fecha de vencimiento.'
+                  : 'Te avisaremos cuando el medicamento esté próximo a vencer.'}
             </p>
-            <div className="color-grid">
-              {coloresMedicamento.map((color, index) => (
-                <div
-                  key={index}
-                  className={`color-swatch ${colorSeleccionado === color.valor ? 'selected' : ''}`}
-                  style={{ backgroundColor: color.valor }}
-                  onClick={() => seleccionColor(color)}
-                >
-                  {colorSeleccionado === color.valor && <span className="checkmark">✓</span>}
-                </div>
-              ))}
-            </div>
           </div>
+
 
           <div className="form-group">
             <div className="toggle-group">
@@ -238,11 +398,13 @@ const NuevaMedicinaScreen = () => {
             />
           </div>
 
-          <button type="submit" className="btn-submit">
-            + Agregar Medicamento
+          <button type="submit" className="btn-submit" disabled={cargando}>
+            {cargando ? 'Cargando...' : (esEdicion ? '💾 Guardar Cambios' : '+ Agregar Medicamento')}
           </button>
         </form>
       </div>
+
+      <MainMenu />
     </div>
   );
 };

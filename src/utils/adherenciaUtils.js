@@ -3,24 +3,30 @@
  */
 
 /**
- * Calcula el porcentaje de adherencia de un medicamento
+ * Calcula el porcentaje de adherencia de un medicamento desde el inicio del tratamiento
  * @param {Object} medicamento - Objeto del medicamento con tomasRealizadas
- * @returns {number} Porcentaje de adherencia (0-100)
+ * @param {string} periodo - 'total', 'mensual', 'semanal', 'diario'
+ * @returns {Object} Objeto con porcentaje, tomas esperadas y realizadas
  */
-export const calcularAdherencia = (medicamento) => {
+export const calcularAdherencia = (medicamento, periodo = 'total') => {
   if (!medicamento) {
-    return 0;
+    return { porcentaje: 0, esperadas: 0, realizadas: 0 };
   }
 
   // Si no está activo, no calcular adherencia
   if (medicamento.activo === false) {
-    return 0;
+    return { porcentaje: 0, esperadas: 0, realizadas: 0 };
+  }
+
+  // Los medicamentos ocasionales (tomasDiarias === 0) no se incluyen en adherencia
+  if (medicamento.tomasDiarias === 0) {
+    return { porcentaje: 0, esperadas: 0, realizadas: 0 };
   }
 
   // Obtener fecha de inicio del tratamiento
   const fechaInicioStr = medicamento.fechaCreacion || medicamento.fechaInicio;
   if (!fechaInicioStr) {
-    return 0;
+    return { porcentaje: 0, esperadas: 0, realizadas: 0 };
   }
 
   const fechaInicio = new Date(fechaInicioStr);
@@ -30,47 +36,95 @@ export const calcularAdherencia = (medicamento) => {
   fechaInicio.setHours(0, 0, 0, 0);
   fechaActual.setHours(0, 0, 0, 0);
   
-  const diasTranscurridos = Math.max(1, Math.floor((fechaActual - fechaInicio) / (1000 * 60 * 60 * 24)));
+  // Calcular fecha límite según el período
+  let fechaLimite = fechaInicio;
+  if (periodo === 'mensual') {
+    fechaLimite = new Date(fechaActual);
+    fechaLimite.setDate(fechaLimite.getDate() - 30);
+    fechaLimite.setHours(0, 0, 0, 0);
+    // Usar la fecha más reciente
+    fechaLimite = fechaLimite > fechaInicio ? fechaLimite : fechaInicio;
+  } else if (periodo === 'semanal') {
+    fechaLimite = new Date(fechaActual);
+    fechaLimite.setDate(fechaLimite.getDate() - 7);
+    fechaLimite.setHours(0, 0, 0, 0);
+    fechaLimite = fechaLimite > fechaInicio ? fechaLimite : fechaInicio;
+  } else if (periodo === 'diario') {
+    fechaLimite = fechaActual;
+  }
+  // Para 'total', usar fechaInicio
+  
+  // Calcular días en el período
+  const diasEnPeriodo = Math.max(1, Math.floor((fechaActual - fechaLimite) / (1000 * 60 * 60 * 24)) + 1);
   
   // Calcular tomas esperadas
   const tomasDiarias = medicamento.tomasDiarias || 1;
-  const tomasEsperadas = diasTranscurridos * tomasDiarias;
+  const tomasEsperadas = diasEnPeriodo * tomasDiarias;
   
   if (tomasEsperadas === 0) {
-    return 0;
+    return { porcentaje: 0, esperadas: 0, realizadas: 0 };
   }
   
-  // Obtener tomas realizadas y contar por día
+  // Obtener tomas realizadas en el período
   const tomasRealizadas = medicamento.tomasRealizadas || [];
-  const tomasPorDia = {};
-  
-  tomasRealizadas.forEach(toma => {
-    if (toma.fecha) {
+  const tomasEnPeriodo = tomasRealizadas.filter(toma => {
+    if (toma.fecha && toma.tomada) {
       try {
         const fecha = new Date(toma.fecha);
         fecha.setHours(0, 0, 0, 0);
-        const fechaKey = fecha.toISOString().split('T')[0];
-        
-        // Verificar que la fecha esté dentro del rango del tratamiento
-        if (fecha >= fechaInicio && fecha <= fechaActual) {
-          if (!tomasPorDia[fechaKey]) {
-            tomasPorDia[fechaKey] = 0;
-          }
-          tomasPorDia[fechaKey]++;
-        }
+        return fecha >= fechaLimite && fecha <= fechaActual;
       } catch (error) {
-        console.warn('Error al procesar fecha de toma:', error);
+        return false;
       }
     }
+    return false;
   });
   
-  // Contar días con tomas completas
-  const diasConTomasCompletas = Object.values(tomasPorDia).filter(count => count >= tomasDiarias).length;
+  const tomasRealizadasCount = tomasEnPeriodo.length;
   
-  // Calcular porcentaje basado en días con tomas completas
-  const porcentaje = Math.min(100, Math.round((diasConTomasCompletas / diasTranscurridos) * 100));
+  // Calcular porcentaje basado en tomas (no días completos)
+  const porcentaje = Math.min(100, Math.round((tomasRealizadasCount / tomasEsperadas) * 100));
   
-  return porcentaje;
+  return {
+    porcentaje,
+    esperadas: tomasEsperadas,
+    realizadas: tomasRealizadasCount,
+    dias: diasEnPeriodo
+  };
+};
+
+/**
+ * Cuenta las veces que se tomó un medicamento ocasional en la semana
+ * @param {Object} medicamento - Objeto del medicamento ocasional
+ * @returns {number} Cantidad de veces que se tomó en la semana
+ */
+export const contarTomasOcasionalesSemana = (medicamento) => {
+  if (!medicamento || medicamento.tomasDiarias !== 0) {
+    return 0;
+  }
+
+  const tomasRealizadas = medicamento.tomasRealizadas || [];
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  
+  const hace7Dias = new Date(hoy);
+  hace7Dias.setDate(hace7Dias.getDate() - 7);
+  hace7Dias.setHours(0, 0, 0, 0);
+  
+  const tomasEnSemana = tomasRealizadas.filter(toma => {
+    if (toma.fecha && toma.tomada) {
+      try {
+        const fecha = new Date(toma.fecha);
+        fecha.setHours(0, 0, 0, 0);
+        return fecha >= hace7Dias && fecha <= hoy;
+      } catch (error) {
+        return false;
+      }
+    }
+    return false;
+  });
+  
+  return tomasEnSemana.length;
 };
 
 /**
@@ -129,16 +183,25 @@ export const calcularTomasSemana = (medicamento) => {
 /**
  * Calcula la adherencia promedio de todos los medicamentos
  * @param {Array} medicamentos - Array de medicamentos
+ * @param {string} periodo - 'total', 'mensual', 'semanal', 'diario'
  * @returns {number} Porcentaje promedio de adherencia
  */
-export const calcularAdherenciaPromedio = (medicamentos) => {
+export const calcularAdherenciaPromedio = (medicamentos, periodo = 'total') => {
   if (!medicamentos || medicamentos.length === 0) {
     return 0;
   }
   
-  const adherencias = medicamentos
-    .filter(med => med.activo !== false)
-    .map(med => calcularAdherencia(med));
+  // Filtrar medicamentos activos y que NO sean ocasionales (tomasDiarias > 0)
+  const medicamentosConAdherencia = medicamentos.filter(med => 
+    med.activo !== false && med.tomasDiarias > 0
+  );
+  
+  if (medicamentosConAdherencia.length === 0) {
+    return 0;
+  }
+  
+  const adherencias = medicamentosConAdherencia
+    .map(med => calcularAdherencia(med, periodo).porcentaje);
   
   if (adherencias.length === 0) {
     return 0;
@@ -191,56 +254,6 @@ export const obtenerEstadoAdherencia = (porcentaje) => {
  * @returns {Object} Objeto con tomas esperadas y realizadas
  */
 export const calcularTomasMensuales = (medicamento) => {
-  if (!medicamento || medicamento.activo === false) {
-    return {
-      esperadas: 0,
-      realizadas: 0,
-      porcentaje: 0
-    };
-  }
-
-  const tomasRealizadas = medicamento.tomasRealizadas || [];
-  const fechaActual = new Date();
-  fechaActual.setHours(0, 0, 0, 0);
-  
-  // Calcular fecha límite (últimos 30 días)
-  const fechaLimite = new Date(fechaActual);
-  fechaLimite.setDate(fechaLimite.getDate() - 30);
-  fechaLimite.setHours(0, 0, 0, 0);
-  
-  // Obtener fecha de inicio del tratamiento
-  const fechaInicioStr = medicamento.fechaCreacion || medicamento.fechaInicio;
-  const fechaInicio = fechaInicioStr ? new Date(fechaInicioStr) : fechaLimite;
-  fechaInicio.setHours(0, 0, 0, 0);
-  
-  // Usar la fecha más reciente entre fecha límite y fecha de inicio
-  const fechaInicioPeriodo = fechaInicio > fechaLimite ? fechaInicio : fechaLimite;
-  
-  // Calcular días en el período
-  const diasEnPeriodo = Math.max(1, Math.floor((fechaActual - fechaInicioPeriodo) / (1000 * 60 * 60 * 24)));
-  const diasRevisar = Math.min(30, diasEnPeriodo);
-  
-  const tomasDiarias = medicamento.tomasDiarias || 1;
-  const tomasEsperadas = diasRevisar * tomasDiarias;
-  
-  // Contar tomas en el período (últimos 30 días o desde inicio del tratamiento)
-  const tomasEnPeriodo = tomasRealizadas.filter(toma => {
-    if (toma.fecha) {
-      try {
-        const fecha = new Date(toma.fecha);
-        fecha.setHours(0, 0, 0, 0);
-        return fecha >= fechaInicioPeriodo && fecha <= fechaActual;
-      } catch (error) {
-        return false;
-      }
-    }
-    return false;
-  }).length;
-  
-  return {
-    esperadas: tomasEsperadas,
-    realizadas: tomasEnPeriodo,
-    porcentaje: tomasEsperadas > 0 ? Math.round((tomasEnPeriodo / tomasEsperadas) * 100) : 0
-  };
+  return calcularAdherencia(medicamento, 'mensual');
 };
 

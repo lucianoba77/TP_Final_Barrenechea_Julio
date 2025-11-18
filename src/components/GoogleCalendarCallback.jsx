@@ -51,6 +51,7 @@ const GoogleCalendarCallback = () => {
     };
 
     procesarCallback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioActual, navigate]);
 
   return (

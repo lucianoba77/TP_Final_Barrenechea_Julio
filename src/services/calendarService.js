@@ -6,10 +6,6 @@
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-// Configuración de Google Calendar API
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-const GOOGLE_API_KEY = process.env.REACT_APP_GOOGLE_API_KEY;
-
 /**
  * Guarda el token de acceso de Google en Firestore
  */
@@ -90,7 +86,7 @@ export const crearEventoToma = async (accessToken, medicamento, fecha, hora) => 
       description: `Toma de ${medicamento.nombre}\n` +
                    `Presentación: ${medicamento.presentacion}\n` +
                    `Condición: ${medicamento.afeccion || 'N/A'}\n` +
-                   `Stock: ${medicamento.stockActual}/${medicamento.stockInicial}`,
+                   `Stock: ${medicamento.stockActual}/${medicamento.diasTratamiento || medicamento.stockInicial}`,
       start: {
         dateTime: fechaCompleta.toISOString(),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -158,7 +154,7 @@ export const actualizarEventoToma = async (accessToken, eventoId, medicamento, f
       description: `Toma de ${medicamento.nombre}\n` +
                    `Presentación: ${medicamento.presentacion}\n` +
                    `Condición: ${medicamento.afeccion || 'N/A'}\n` +
-                   `Stock: ${medicamento.stockActual}/${medicamento.stockInicial}`,
+                   `Stock: ${medicamento.stockActual}/${medicamento.diasTratamiento || medicamento.stockInicial}`,
       start: {
         dateTime: fechaCompleta.toISOString(),
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone

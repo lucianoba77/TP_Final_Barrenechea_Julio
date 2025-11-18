@@ -1,31 +1,41 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { esUsuarioGoogle } from '../services/authService';
 import { agregarAsistente, obtenerAsistentes, eliminarAsistente } from '../services/asistentesService';
 import './GestionarAsistentes.css';
 
 const GestionarAsistentes = () => {
   const { usuarioActual } = useAuth();
   const { showSuccess, showError, showConfirm } = useNotification();
+  const navigate = useNavigate();
   const [asistentes, setAsistentes] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    nombre: ''
+    nombre: '',
+    password: ''
   });
 
   useEffect(() => {
     if (usuarioActual && usuarioActual.role === 'paciente') {
       cargarAsistentes();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioActual]);
 
   const cargarAsistentes = async () => {
     if (!usuarioActual) return;
+    const pacienteId = usuarioActual.id || usuarioActual.uid;
+    if (!pacienteId) {
+      showError('No pudimos identificar tu cuenta. Intenta cerrar sesión e ingresar nuevamente.');
+      return;
+    }
 
     setCargando(true);
-    const resultado = await obtenerAsistentes(usuarioActual.id);
+    const resultado = await obtenerAsistentes(pacienteId);
     if (resultado.success) {
       setAsistentes(resultado.asistentes);
     } else {
@@ -45,23 +55,52 @@ const GestionarAsistentes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.email.trim() || !formData.nombre.trim()) {
+    const pacienteId = usuarioActual?.id || usuarioActual?.uid;
+    if (!pacienteId) {
+      showError('No pudimos identificar tu cuenta. Intenta cerrar sesión e ingresar nuevamente.');
+      return;
+    }
+
+    if (!formData.email.trim() || !formData.nombre.trim() || !formData.password.trim()) {
       showError('Por favor completa todos los campos');
       return;
     }
 
+    if (formData.password.length < 6) {
+      showError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
     setCargando(true);
+    
+    // Determinar si el paciente se logueó con Google
+    const esGoogle = esUsuarioGoogle();
+    const credencialesPaciente = {
+      email: usuarioActual?.email,
+      esGoogle: esGoogle
+    };
+
     const resultado = await agregarAsistente(
-      usuarioActual.id,
+      pacienteId,
       formData.email.trim(),
-      formData.nombre.trim()
+      formData.nombre.trim(),
+      formData.password.trim(),
+      credencialesPaciente
     );
 
     if (resultado.success) {
-      showSuccess(`Asistente ${formData.nombre} agregado exitosamente`);
-      setFormData({ email: '', nombre: '' });
-      setMostrarFormulario(false);
-      cargarAsistentes();
+      if (resultado.requiereReLogin) {
+        showSuccess(resultado.mensaje || 'Asistente creado exitosamente. Por favor, inicia sesión nuevamente.');
+        // Redirigir al login después de un breve delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } else {
+        showSuccess(`Asistente ${formData.nombre} agregado exitosamente. El asistente puede iniciar sesión con el email "${formData.email.trim()}" y la contraseña proporcionada.`);
+        setFormData({ email: '', nombre: '', password: '' });
+        setMostrarFormulario(false);
+        cargarAsistentes();
+      }
     } else {
       showError(resultado.error || 'Error al agregar asistente');
     }
@@ -98,10 +137,7 @@ const GestionarAsistentes = () => {
   return (
     <div className="gestionar-asistentes">
       <div className="asistentes-header">
-        <div>
-          <h3>Gestionar Asistentes</h3>
-          <p>Agrega asistentes que puedan ver tu botiquín e historial de adherencia</p>
-        </div>
+        <p className="asistentes-description">Agrega asistentes que puedan ver tu botiquín e historial de adherencia</p>
         <button
           className="btn-agregar-asistente"
           onClick={() => setMostrarFormulario(!mostrarFormulario)}
@@ -138,8 +174,22 @@ const GestionarAsistentes = () => {
                 placeholder="ejemplo@email.com"
                 required
               />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password">Contraseña del asistente</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Mínimo 6 caracteres"
+                required
+                minLength={6}
+              />
               <p className="help-text">
-                El asistente podrá iniciar sesión con este email (preferiblemente con Google)
+                El asistente podrá iniciar sesión con este email y contraseña
               </p>
             </div>
 
@@ -193,8 +243,9 @@ const GestionarAsistentes = () => {
           <li>Los asistentes solo pueden ver tu botiquín e historial de adherencia</li>
           <li>No pueden ver tu dashboard diario ni ajustes</li>
           <li>No pueden agregar, editar o eliminar medicamentos</li>
-          <li>Los asistentes deben iniciar sesión con el email que proporcionaste</li>
-          <li>Recomendamos que usen login con Google para mayor seguridad</li>
+          <li>Los asistentes deben registrarse o iniciar sesión con el email y contraseña que proporcionaste</li>
+          <li>Los asistentes NO pueden usar login con Google, solo email y contraseña</li>
+          <li>El asistente se conectará desde otro dispositivo, cerrará su sesión de paciente (si la tiene) e iniciará sesión con sus credenciales de asistente</li>
         </ul>
       </div>
     </div>

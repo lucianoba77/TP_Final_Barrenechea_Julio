@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { useNotification } from '../context/NotificationContext';
 import { 
-  guardarTokenGoogle, 
-  obtenerTokenGoogle, 
   eliminarTokenGoogle,
   tieneGoogleCalendarConectado
 } from '../services/calendarService';
@@ -14,7 +11,6 @@ import './GoogleCalendarSync.css';
 
 const GoogleCalendarSync = () => {
   const { usuarioActual } = useAuth();
-  const navigate = useNavigate();
   const { showError, showWarning, showSuccess } = useNotification();
   const [conectado, setConectado] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -23,6 +19,7 @@ const GoogleCalendarSync = () => {
   useEffect(() => {
     // Solo verificar conexión, el callback se maneja en GoogleCalendarCallback
     verificarConexion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioActual]);
 
   const verificarConexion = async () => {
@@ -89,13 +86,6 @@ const GoogleCalendarSync = () => {
 
   return (
     <div className="calendar-sync-container">
-      <div className="calendar-sync-header">
-        <div className="calendar-icon">📅</div>
-        <div>
-          <h3>Sincronización con Google Calendar</h3>
-          <p>Sincroniza tus tomas de medicamentos con tu calendario</p>
-        </div>
-      </div>
 
       {conectado ? (
         <div className="calendar-sync-connected">

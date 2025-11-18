@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useStockAlerts } from '../hooks/useStockAlerts';
 import MedicamentoCard from '../components/MedicamentoCard';
 import MainMenu from '../components/MainMenu';
+import UserMenu from '../components/UserMenu';
 import './DashboardScreen.css';
 
 const DashboardScreen = () => {
@@ -14,9 +15,11 @@ const DashboardScreen = () => {
   useStockAlerts(7); // Alertar cuando queden 7 días o menos
 
   // Filtrar medicamentos del día de hoy
+  // Solo mostrar medicamentos activos con tomas diarias > 0 (los de 0 tomas solo aparecen en botiquín)
   const medicamentosHoy = medicamentos.filter(medicamento => {
-    // Esta lógica se puede expandir según necesidad
-    return medicamento.activo !== false;
+    return medicamento.activo !== false && 
+           medicamento.tomasDiarias > 0 &&
+           medicamento.primeraToma; // Debe tener hora programada
   });
 
   // Ordenar por hora
@@ -33,7 +36,7 @@ const DashboardScreen = () => {
           <h1 className="greeting">¡Hola, {usuarioActual?.nombre || 'Usuario'}!</h1>
           <p className="sub-greeting">Mantén tu tratamiento al día</p>
         </div>
-        <div className="header-icon">👤</div>
+        <UserMenu />
       </div>
 
       <div className="dashboard-content">

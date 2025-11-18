@@ -1,18 +1,21 @@
 /**
- * Colores disponibles para medicamentos
+ * Colores pasteles disponibles para medicamentos (5 colores)
+ * Se asignan automáticamente en orden cíclico
  */
 export const coloresMedicamento = [
-  { nombre: 'Blanco', valor: '#FFFFFF' },
-  { nombre: 'Rosa claro', valor: '#FFB6C1' },
-  { nombre: 'Azul claro', valor: '#ADD8E6' },
-  { nombre: 'Beige', valor: '#F5F5DC' },
-  { nombre: 'Violeta claro', valor: '#E6E6FA' },
-  { nombre: 'Verde claro', valor: '#90EE90' },
-  { nombre: 'Amarillo', valor: '#FFFF00' },
-  { nombre: 'Naranja', valor: '#FFA500' },
-  { nombre: 'Púrpura', valor: '#800080' },
-  { nombre: 'Azul brillante', valor: '#00BFFF' },
-  { nombre: 'Verde brillante', valor: '#00FF00' },
-  { nombre: 'Rojo', valor: '#FF0000' }
+  { nombre: 'Rosa pastel', valor: '#FFB6C1' },
+  { nombre: 'Azul pastel', valor: '#ADD8E6' },
+  { nombre: 'Verde pastel', valor: '#B0E0E6' },
+  { nombre: 'Amarillo pastel', valor: '#FFFACD' },
+  { nombre: 'Lavanda pastel', valor: '#E6E6FA' }
 ];
+
+/**
+ * Obtiene el color para un medicamento según su índice
+ * Los colores se asignan en orden cíclico (1-5, luego se repiten)
+ */
+export const obtenerColorPorIndice = (indice) => {
+  const indiceColor = indice % coloresMedicamento.length;
+  return coloresMedicamento[indiceColor].valor;
+};
 

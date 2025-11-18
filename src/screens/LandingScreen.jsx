@@ -1,16 +1,45 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNotification } from '../context/NotificationContext';
+import logoMiMedicina from '../img/MiMedicina_Logo.png';
+import googlePlayStore from '../img/GoogelPlayStore.png';
 import './LandingScreen.css';
 
 const LandingScreen = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { showSuccess } = useNotification();
+  const [mostrarMensaje, setMostrarMensaje] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('cuentaEliminada') === 'true') {
+      setMostrarMensaje(true);
+      showSuccess('Tu cuenta ha sido eliminada correctamente');
+      // Limpiar el parámetro de la URL
+      setSearchParams({}, { replace: true });
+      // Ocultar el mensaje después de 5 segundos
+      setTimeout(() => setMostrarMensaje(false), 5000);
+    }
+  }, [searchParams, setSearchParams, showSuccess]);
 
   return (
     <div className="landing-screen">
+      {/* Mensaje de cuenta eliminada */}
+      {mostrarMensaje && (
+        <div className="cuenta-eliminada-banner">
+          <div className="banner-content">
+            <span className="banner-icon">✅</span>
+            <span className="banner-text">Tu cuenta ha sido eliminada correctamente</span>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
-          <div className="hero-icon">💊</div>
+          <div className="hero-logo-container">
+            <img src={logoMiMedicina} alt="MiMedicina Logo" className="hero-logo" />
+          </div>
           <h1 className="hero-title">MiMedicina</h1>
           <p className="hero-subtitle">Tu asistente personal para el control de medicamentos</p>
           <p className="hero-description">
@@ -25,15 +54,20 @@ const LandingScreen = () => {
             </button>
           </div>
           <div className="play-store-badge">
-            <span>📱</span>
-            <span>Disponible en Google Play Store</span>
+            <p className="play-store-text">También disponible en</p>
+            <img src={googlePlayStore} alt="Disponible en Google Play Store" className="play-store-image" />
           </div>
         </div>
       </section>
 
       {/* Features Section */}
       <section className="features-section">
-        <h2 className="section-title">¿Por qué elegir MiMedicina?</h2>
+        <div className="section-header">
+          <div className="section-title-wrapper">
+            <span className="section-icon">💡</span>
+            <h2 className="section-title">¿Por qué elegir MiMedicina?</h2>
+          </div>
+        </div>
         
         <div className="features-grid">
           <div className="feature-card">
@@ -53,7 +87,9 @@ const LandingScreen = () => {
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">💊</div>
+            <div className="feature-icon-container">
+              <img src={logoMiMedicina} alt="Botiquín Virtual" className="feature-icon-image" />
+            </div>
             <h3 className="feature-title">Botiquín Virtual</h3>
             <p className="feature-description">
               Ve a simple vista todo lo que tienes en tu botiquín físico. Controla stock, organiza por medicamentos y mantén todo ordenado.
@@ -88,7 +124,12 @@ const LandingScreen = () => {
 
       {/* Pricing Section */}
       <section className="pricing-section">
-        <h2 className="section-title">Planes y Precios</h2>
+        <div className="section-header">
+          <div className="section-title-wrapper">
+            <span className="section-icon">💰</span>
+            <h2 className="section-title">Planes y Precios</h2>
+          </div>
+        </div>
         
         <div className="pricing-grid">
           <div className="pricing-card free">

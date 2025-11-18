@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import logoMiMedicina from '../img/MiMedicina_Logo.png';
 import './LoginScreen.css';
 
 const LoginScreen = () => {
@@ -11,9 +12,21 @@ const LoginScreen = () => {
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
-  const { login, registro, loginWithGoogle } = useAuth();
+  const { login, registro, loginWithGoogle, usuarioActual, cargando: authCargando } = useAuth();
   const { showError, showSuccess } = useNotification();
   const navigate = useNavigate();
+
+  // Redirigir si el usuario ya está autenticado
+  useEffect(() => {
+    if (!authCargando && usuarioActual) {
+      const role = usuarioActual.role || 'paciente';
+      if (role === 'asistente') {
+        navigate('/botiquin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [usuarioActual, authCargando, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +37,13 @@ const LoginScreen = () => {
       if (isLogin) {
         const resultado = await login(email, password);
         if (resultado.success) {
-          navigate('/dashboard');
+          // Redirigir según el rol
+          const role = resultado.usuario?.role || 'paciente';
+          if (role === 'asistente') {
+            navigate('/botiquin', { replace: true });
+          } else {
+            navigate('/dashboard', { replace: true });
+          }
         } else {
           setError(resultado.error || 'Credenciales inválidas');
         }
@@ -57,21 +76,17 @@ const LoginScreen = () => {
       const resultado = await loginWithGoogle();
       if (resultado.success) {
         showSuccess('¡Bienvenido!');
-        // Redirigir según el rol
-        if (resultado.usuario.role === 'asistente') {
-          navigate('/botiquin');
-        } else {
-          navigate('/dashboard');
-        }
+        // La redirección se manejará automáticamente por el useEffect cuando usuarioActual se actualice
+        // No necesitamos navegar manualmente aquí
       } else {
         setError(resultado.error || 'Error al iniciar sesión con Google');
         showError(resultado.error || 'Error al iniciar sesión con Google');
+        setCargando(false);
       }
     } catch (error) {
       setError('Error inesperado. Intenta nuevamente.');
       showError('Error al iniciar sesión con Google');
       console.error('Error en login con Google:', error);
-    } finally {
       setCargando(false);
     }
   };
@@ -80,8 +95,10 @@ const LoginScreen = () => {
     <div className="login-screen">
       <div className="login-container">
         <div className="login-header">
-          <div className="app-icon">💊</div>
-          <h1 className="app-title">MediControl</h1>
+          <div className="app-icon-container">
+            <img src={logoMiMedicina} alt="MiMedicina" className="app-icon" />
+          </div>
+          <h1 className="app-title">MiMedicina</h1>
           <p className="app-subtitle">Tu asistente personal de medicamentos</p>
         </div>
 

@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useMed } from '../context/MedContext';
 import { useAuth } from '../context/AuthContext';
 import MainMenu from '../components/MainMenu';
+import UserMenu from '../components/UserMenu';
 import { 
   calcularAdherencia, 
   calcularAdherenciaPromedio, 
   obtenerEstadoAdherencia,
   calcularTomasSemana,
-  calcularTomasMensuales
+  contarTomasOcasionalesSemana
 } from '../utils/adherenciaUtils';
 import './HistorialScreen.css';
 
@@ -20,8 +21,18 @@ const HistorialScreen = () => {
   const totalMedicamentos = medicamentos.length;
   const activos = medicamentos.filter(medicamento => medicamento.activo !== false).length;
   const completados = medicamentos.filter(medicamento => medicamento.stockActual === 0 || medicamento.activo === false).length;
-  const adherenciaPromedio = calcularAdherenciaPromedio(medicamentos);
-  const estadoAdherencia = obtenerEstadoAdherencia(adherenciaPromedio);
+  
+  // Separar medicamentos con adherencia de los ocasionales
+  const medicamentosConAdherencia = medicamentos.filter(med => 
+    med.activo !== false && med.tomasDiarias > 0
+  );
+  const medicamentosOcasionales = medicamentos.filter(med => 
+    med.activo !== false && med.tomasDiarias === 0
+  );
+  
+  // Calcular adherencia promedio total (solo medicamentos con adherencia, excluyendo ocasionales)
+  const adherenciaPromedioTotal = calcularAdherenciaPromedio(medicamentos, 'total');
+  const estadoAdherencia = obtenerEstadoAdherencia(adherenciaPromedioTotal);
   const esAsistente = usuarioActual?.role === 'asistente';
 
   // Redirigir según el rol al hacer clic en home
@@ -38,26 +49,27 @@ const HistorialScreen = () => {
       <div className="historial-header">
         <button className="btn-home" onClick={handleHomeClick}>🏠</button>
         <h1>Historial{esAsistente && ' del Paciente'}</h1>
+        {!esAsistente && <UserMenu />}
       </div>
 
       <div className="historial-content">
-        {/* Tarjeta de adherencia promedio */}
+        {/* Tarjeta de adherencia promedio total */}
         <div className="adherencia-promedio-card" style={{ borderLeftColor: estadoAdherencia.color }}>
           <div className="adherencia-promedio-header">
             <div className="adherencia-icon">{estadoAdherencia.icono}</div>
             <div>
-              <h2>Adherencia Promedio</h2>
-              <p className="adherencia-mensaje">{estadoAdherencia.mensaje}</p>
+              <h2>Adherencia Total</h2>
+              <p className="adherencia-mensaje">{estadoAdherencia.mensaje} - Desde el inicio del tratamiento</p>
             </div>
           </div>
           <div className="adherencia-porcentaje-grande" style={{ color: estadoAdherencia.color }}>
-            {adherenciaPromedio}%
+            {adherenciaPromedioTotal}%
           </div>
           <div className="adherencia-bar-large">
             <div 
               className="adherencia-bar-fill" 
               style={{ 
-                width: `${adherenciaPromedio}%`,
+                width: `${adherenciaPromedioTotal}%`,
                 backgroundColor: estadoAdherencia.color
               }}
             />
@@ -93,39 +105,48 @@ const HistorialScreen = () => {
         <div className="section-card">
           <div className="section-header">
             <div className="section-icon">📈</div>
-            <h2 className="section-title">Adherencia por medicamento</h2>
+            <h2 className="section-title">Adherencia por medicamento (Total)</h2>
           </div>
           
           <div className="adherencia-list">
-            {medicamentos.filter(med => med.activo !== false).length === 0 ? (
-              <p className="empty-message">No hay medicamentos activos</p>
+            {medicamentosConAdherencia.length === 0 ? (
+              <p className="empty-message">No hay medicamentos con adherencia registrada</p>
             ) : (
-              medicamentos
-                .filter(med => med.activo !== false)
-                .map(medicamento => {
-                  const adherencia = calcularAdherencia(medicamento);
-                  const estado = obtenerEstadoAdherencia(adherencia);
-                  const tomasMensuales = calcularTomasMensuales(medicamento);
+              medicamentosConAdherencia.map(medicamento => {
+                  const adherenciaTotal = calcularAdherencia(medicamento, 'total');
+                  const adherenciaMensual = calcularAdherencia(medicamento, 'mensual');
+                  const adherenciaSemanal = calcularAdherencia(medicamento, 'semanal');
+                  const estado = obtenerEstadoAdherencia(adherenciaTotal.porcentaje);
+                  const esCronico = medicamento.esCronico || false;
                   
                   return (
                     <div key={medicamento.id} className="adherencia-item">
                       <div className="adherencia-item-header">
-                        <span className="adherencia-nombre">{medicamento.nombre}</span>
+                        <div>
+                          <span className="adherencia-nombre">{medicamento.nombre}</span>
+                          {esCronico && <span className="cronico-badge">Crónico</span>}
+                        </div>
                         <span className="adherencia-porcentaje" style={{ color: estado.color }}>
-                          {adherencia}%
+                          {adherenciaTotal.porcentaje}%
                         </span>
                       </div>
                       <div className="adherencia-bar-container">
                         <div 
                           className="adherencia-bar"
                           style={{ 
-                            width: `${adherencia}%`,
+                            width: `${adherenciaTotal.porcentaje}%`,
                             backgroundColor: estado.color
                           }}
                         />
                       </div>
                       <div className="adherencia-stats">
-                        <span className="stat-label">Tomas: {tomasMensuales.realizadas}/{tomasMensuales.esperadas}</span>
+                        <div className="stat-row">
+                          <span className="stat-label"><strong>Total:</strong> {adherenciaTotal.realizadas}/{adherenciaTotal.esperadas} tomas ({adherenciaTotal.dias} días)</span>
+                        </div>
+                        <div className="stat-row">
+                          <span className="stat-label">Mensual: {adherenciaMensual.porcentaje}% ({adherenciaMensual.realizadas}/{adherenciaMensual.esperadas})</span>
+                          <span className="stat-label">Semanal: {adherenciaSemanal.porcentaje}% ({adherenciaSemanal.realizadas}/{adherenciaSemanal.esperadas})</span>
+                        </div>
                         <span className="stat-label">{estado.mensaje}</span>
                       </div>
                     </div>
@@ -135,7 +156,40 @@ const HistorialScreen = () => {
           </div>
         </div>
 
-        {medicamentos.filter(med => med.activo !== false).length > 0 && (
+        {/* Sección de medicamentos ocasionales */}
+        {medicamentosOcasionales.length > 0 && (
+          <div className="section-card">
+            <div className="section-header">
+              <div className="section-icon">💊</div>
+              <h2 className="section-title">Medicamentos ocasionales (última semana)</h2>
+            </div>
+            
+            <div className="ocasionales-list">
+              {medicamentosOcasionales.map(medicamento => {
+                const tomasSemana = contarTomasOcasionalesSemana(medicamento);
+                
+                return (
+                  <div key={medicamento.id} className="ocasional-item">
+                    <div className="ocasional-item-header">
+                      <span className="ocasional-nombre">{medicamento.nombre}</span>
+                      <span className="ocasional-tomas">
+                        {tomasSemana} {tomasSemana === 1 ? 'vez' : 'veces'} esta semana
+                      </span>
+                    </div>
+                    <div className="ocasional-info">
+                      <span className="ocasional-stock">Stock: {medicamento.stockActual || 0}</span>
+                      {medicamento.afeccion && (
+                        <span className="ocasional-afeccion">• {medicamento.afeccion}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {medicamentosConAdherencia.length > 0 && (
           <div className="section-card">
             <div className="section-header">
               <div className="section-icon">📅</div>
@@ -143,9 +197,8 @@ const HistorialScreen = () => {
             </div>
             
             <div className="weekly-summary">
-              {medicamentos
-                .filter(med => med.activo !== false)
-                .slice(0, 1) // Mostrar solo el primer medicamento activo
+              {medicamentosConAdherencia
+                .slice(0, 1) // Mostrar solo el primer medicamento con adherencia
                 .map(medicamento => {
                   const tomasSemana = calcularTomasSemana(medicamento);
                   const tomasDiarias = medicamento.tomasDiarias || 1;

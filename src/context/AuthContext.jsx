@@ -4,7 +4,8 @@ import {
   registrarUsuario as registrarUsuarioFirebase,
   cerrarSesion as cerrarSesionFirebase,
   observarEstadoAuth,
-  iniciarSesionConGoogle as iniciarSesionConGoogleFirebase
+  iniciarSesionConGoogle as iniciarSesionConGoogleFirebase,
+  eliminarCuenta as eliminarCuentaFirebase
 } from '../services/authService';
 import { esAsistenteDe } from '../services/asistentesService';
 
@@ -44,15 +45,19 @@ export const AuthProvider = ({ children }) => {
       const resultado = await iniciarSesionConGoogleFirebase();
       
       if (resultado.success) {
-        // Verificar si el usuario es asistente
-        const asistenteResult = await esAsistenteDe(resultado.usuario.email);
-        
-        if (asistenteResult.success && asistenteResult.esAsistente) {
-          // Si es asistente, actualizar el usuario con el rol y el pacienteId
-          resultado.usuario.role = 'asistente';
-          resultado.usuario.pacienteId = asistenteResult.pacienteId;
-          resultado.usuario.paciente = asistenteResult.paciente;
+        if (!resultado.usuario?.role) {
+          const asistenteResult = await esAsistenteDe(resultado.usuario.email, { ignorarPacienteId: resultado.usuario.id });
+          
+          if (asistenteResult.success && asistenteResult.esAsistente) {
+            resultado.usuario.role = 'asistente';
+            resultado.usuario.pacienteId = asistenteResult.pacienteId;
+            resultado.usuario.paciente = asistenteResult.paciente;
+          } else {
+            resultado.usuario.role = 'paciente';
+          }
         }
+        
+        setUsuarioActual(resultado.usuario);
       }
       
       setCargando(false);
@@ -67,17 +72,43 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    try {
+      setCargando(true);
+      await cerrarSesionFirebase();
+      setUsuarioActual(null);
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      // Aun así, limpiar el estado local
+      setUsuarioActual(null);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const eliminarCuenta = async (email, password, esGoogle = false) => {
     setCargando(true);
-    await cerrarSesionFirebase();
-    setUsuarioActual(null);
-    setCargando(false);
+    try {
+      const resultado = await eliminarCuentaFirebase(email, password, esGoogle);
+      if (resultado.success) {
+        setUsuarioActual(null);
+      }
+      return resultado;
+    } catch (error) {
+      console.error('Error al eliminar cuenta:', error);
+      return {
+        success: false,
+        error: error.message || 'Error al eliminar la cuenta'
+      };
+    } finally {
+      setCargando(false);
+    }
   };
 
   // Verificar si el usuario es asistente al cargar
   useEffect(() => {
     const verificarRolAsistente = async () => {
       if (usuarioActual && usuarioActual.email && !usuarioActual.role) {
-        const asistenteResult = await esAsistenteDe(usuarioActual.email);
+        const asistenteResult = await esAsistenteDe(usuarioActual.email, { ignorarPacienteId: usuarioActual.id || usuarioActual.uid });
         
         if (asistenteResult.success && asistenteResult.esAsistente) {
           setUsuarioActual(prev => ({
@@ -107,7 +138,8 @@ export const AuthProvider = ({ children }) => {
       login, 
       registro,
       loginWithGoogle,
-      logout, 
+      logout,
+      eliminarCuenta, 
       cargando 
     }}>
       {children}

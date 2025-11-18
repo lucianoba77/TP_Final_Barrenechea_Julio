@@ -7,14 +7,16 @@
 
 .historial-header {
   background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
-  padding: max(20px, env(safe-area-inset-top) + 12px) var(--spacing-md) var(--spacing-md);
+  padding: max(20px, env(safe-area-inset-top) + 12px) var(--spacing-lg) var(--spacing-md);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--spacing-md);
   box-shadow: var(--shadow-md);
   position: sticky;
   top: 0;
   z-index: 100;
+  overflow: visible;
 }
 
 .btn-home {
@@ -37,6 +39,8 @@
   font-size: 24px;
   font-weight: 700;
   margin: 0;
+  flex: 1;
+  text-align: center;
 }
 
 .historial-content {
@@ -187,6 +191,61 @@
   gap: 12px;
 }
 
+.ocasionales-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ocasional-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #FFF9E6;
+  border-radius: 12px;
+  border-left: 4px solid #FF9800;
+}
+
+.ocasional-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ocasional-nombre {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+}
+
+.ocasional-tomas {
+  font-weight: 600;
+  font-size: 14px;
+  color: #FF9800;
+  background: rgba(255, 152, 0, 0.1);
+  padding: 4px 12px;
+  border-radius: 16px;
+}
+
+.ocasional-info {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  color: #666;
+  flex-wrap: wrap;
+}
+
+.ocasional-stock {
+  font-weight: 500;
+}
+
+.ocasional-afeccion {
+  color: #999;
+}
+
 .adherencia-nombre {
   flex: 1;
   font-size: 16px;
@@ -203,15 +262,34 @@
 
 .adherencia-stats {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
   font-size: 12px;
   color: #666;
+}
+
+.adherencia-stats .stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .adherencia-stats .stat-label {
   font-size: 12px;
   color: #666;
+}
+
+.cronico-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  text-transform: uppercase;
 }
 
 .empty-message {
