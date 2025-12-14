@@ -67,12 +67,23 @@ export const calcularAdherencia = (medicamento, periodo = 'total') => {
   
   // Obtener tomas realizadas en el período
   const tomasRealizadas = medicamento.tomasRealizadas || [];
+  
+  // Normalizar fechas límite a strings para comparación consistente
+  const fechaLimiteStr = fechaLimite.toISOString().split('T')[0];
+  const fechaActualStr = fechaActual.toISOString().split('T')[0];
+  
   const tomasEnPeriodo = tomasRealizadas.filter(toma => {
     if (toma.fecha && toma.tomada) {
       try {
-        const fecha = new Date(toma.fecha);
-        fecha.setHours(0, 0, 0, 0);
-        return fecha >= fechaLimite && fecha <= fechaActual;
+        // Si toma.fecha ya es un string YYYY-MM-DD, usarlo directamente
+        // Si es un objeto Date o timestamp, convertirlo
+        let fechaStr = toma.fecha;
+        if (typeof fechaStr !== 'string') {
+          const fecha = new Date(fechaStr);
+          fechaStr = fecha.toISOString().split('T')[0];
+        }
+        // Comparar strings directamente (más robusto que comparar Date)
+        return fechaStr >= fechaLimiteStr && fechaStr <= fechaActualStr;
       } catch (error) {
         return false;
       }
@@ -111,12 +122,22 @@ export const contarTomasOcasionalesSemana = (medicamento) => {
   hace7Dias.setDate(hace7Dias.getDate() - 7);
   hace7Dias.setHours(0, 0, 0, 0);
   
+  // Normalizar fechas a strings para comparación consistente
+  const hace7DiasStr = hace7Dias.toISOString().split('T')[0];
+  const hoyStr = hoy.toISOString().split('T')[0];
+  
   const tomasEnSemana = tomasRealizadas.filter(toma => {
     if (toma.fecha && toma.tomada) {
       try {
-        const fecha = new Date(toma.fecha);
-        fecha.setHours(0, 0, 0, 0);
-        return fecha >= hace7Dias && fecha <= hoy;
+        // Si toma.fecha ya es un string YYYY-MM-DD, usarlo directamente
+        // Si es un objeto Date o timestamp, convertirlo
+        let fechaStr = toma.fecha;
+        if (typeof fechaStr !== 'string') {
+          const fecha = new Date(fechaStr);
+          fechaStr = fecha.toISOString().split('T')[0];
+        }
+        // Comparar strings directamente (más robusto que comparar Date)
+        return fechaStr >= hace7DiasStr && fechaStr <= hoyStr;
       } catch (error) {
         return false;
       }

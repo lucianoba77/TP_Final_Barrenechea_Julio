@@ -111,29 +111,66 @@ src/
 
 ## 📦 Instalación
 
+### 1. Instalar dependencias
+
 ```bash
-# Instalar dependencias
 npm install
+```
 
-# Configurar variables de entorno
-# Crear archivo .env con:
-# REACT_APP_FIREBASE_API_KEY=...
-# REACT_APP_FIREBASE_AUTH_DOMAIN=...
-# REACT_APP_FIREBASE_PROJECT_ID=...
-# REACT_APP_FIREBASE_STORAGE_BUCKET=...
-# REACT_APP_FIREBASE_MESSAGING_SENDER_ID=...
-# REACT_APP_FIREBASE_APP_ID=...
-# REACT_APP_FIREBASE_MEASUREMENT_ID=...
-# REACT_APP_GOOGLE_CLIENT_ID=...
+### 2. Configurar Firebase
 
-# Iniciar servidor de desarrollo
+1. Crea un proyecto en [Firebase Console](https://console.firebase.google.com/)
+2. Habilita **Authentication** (Email/Password y Google)
+3. Crea una base de datos **Firestore** en modo de prueba
+4. Ve a **Configuración del proyecto** → **Tus aplicaciones** → **Web**
+5. Copia las credenciales de configuración
+
+### 3. Configurar variables de entorno
+
+1. Copia el archivo `.env.example` a `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edita el archivo `.env` y reemplaza los valores con tus credenciales de Firebase:
+   ```env
+   REACT_APP_FIREBASE_API_KEY=tu_api_key_real
+   REACT_APP_FIREBASE_AUTH_DOMAIN=tu_proyecto.firebaseapp.com
+   REACT_APP_FIREBASE_PROJECT_ID=tu_proyecto_id
+   REACT_APP_FIREBASE_STORAGE_BUCKET=tu_proyecto.appspot.com
+   REACT_APP_FIREBASE_MESSAGING_SENDER_ID=123456789
+   REACT_APP_FIREBASE_APP_ID=1:123456789:web:abcdef
+   REACT_APP_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
+   ```
+
+3. (Opcional) Para Google Calendar, configura `REACT_APP_GOOGLE_CLIENT_ID` siguiendo las instrucciones en `.env.example`
+
+### 4. Configurar Firestore Rules
+
+Asegúrate de configurar las reglas de seguridad de Firestore. Consulta la documentación de Firebase para las reglas recomendadas.
+
+### 5. Iniciar la aplicación
+
+```bash
 npm start
 ```
+
+La aplicación se abrirá en `http://localhost:3000`
 
 ## 🚀 Scripts Disponibles
 
 - `npm start` - Inicia el servidor de desarrollo
-- `npm build` - Construye la aplicación para producción
+- `npm run build` - Construye la aplicación para producción (genera carpeta `build/`)
 - `npm test` - Ejecuta los tests
 - `npm eject` - Expone la configuración de Create React App (irreversible)
+
+## 📦 Build para Producción
+
+Para generar la versión optimizada de producción:
+
+```bash
+npm run build
+```
+
+Esto creará una carpeta `build/` con los archivos optimizados listos para desplegar.
 

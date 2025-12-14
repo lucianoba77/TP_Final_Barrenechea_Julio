@@ -8,7 +8,6 @@ import {
   calcularAdherencia, 
   calcularAdherenciaPromedio, 
   obtenerEstadoAdherencia,
-  calcularTomasSemana,
   contarTomasOcasionalesSemana
 } from '../utils/adherenciaUtils';
 import './HistorialScreen.css';
@@ -190,60 +189,6 @@ const HistorialScreen = () => {
           </div>
         )}
 
-        {medicamentosConAdherencia.length > 0 && (
-          <div className="section-card">
-            <div className="section-header">
-              <div className="section-icon">📅</div>
-              <h2 className="section-title">Resumen semanal</h2>
-            </div>
-            
-            <div className="weekly-summary">
-              {medicamentosConAdherencia
-                .slice(0, 1) // Mostrar solo el primer medicamento con adherencia
-                .map(medicamento => {
-                  const tomasSemana = calcularTomasSemana(medicamento);
-                  const tomasDiarias = medicamento.tomasDiarias || 1;
-                  
-                  return (
-                    <div key={medicamento.id} className="medicamento-semana">
-                      <h4 className="medicamento-semana-nombre">{medicamento.nombre}</h4>
-                      <div className="days-row">
-                        {tomasSemana.map((dia, index) => {
-                          const cumplido = dia.tomas >= tomasDiarias;
-                          const parcial = dia.tomas > 0 && dia.tomas < tomasDiarias;
-                          
-                          return (
-                            <div key={index} className="day-cell">
-                              <div className="day-letter">{dia.dia}</div>
-                              <div className={`day-dot ${cumplido ? 'cumplido' : parcial ? 'parcial' : 'perdido'}`}>
-                                <span className="dot-inner"></span>
-                              </div>
-                              <div className="day-tomas">{dia.tomas}/{tomasDiarias}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <div className="legend">
-              <div className="legend-item">
-                <div className="legend-dot cumplido"></div>
-                <span>Cumplido</span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-dot parcial"></div>
-                <span>Parcial</span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-dot perdido"></div>
-                <span>Perdido</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <MainMenu />

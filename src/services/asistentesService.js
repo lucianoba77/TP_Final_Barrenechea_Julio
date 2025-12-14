@@ -102,7 +102,7 @@ export const agregarAsistente = async (pacienteId, emailAsistente, nombreAsisten
         // Si el paciente se logueó con Google, intentar restaurar con popup
         try {
           const provider = new GoogleAuthProvider();
-          const resultadoPopup = await signInWithPopup(auth, provider);
+          await signInWithPopup(auth, provider);
           // Esperar un momento para que el estado se actualice
           await new Promise(resolve => setTimeout(resolve, 500));
           // Si la restauración fue exitosa, retornar éxito sin requerir re-login
